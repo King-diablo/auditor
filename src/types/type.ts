@@ -69,3 +69,8 @@ export type TCustomEvent = {
 };
 
 export type TEvent = TKnownEvent | TCustomEvent;
+
+export type TFileConfig = {
+    fileName: string,
+    folderName: string;
+};

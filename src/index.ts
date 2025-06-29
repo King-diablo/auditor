@@ -1,7 +1,6 @@
 import { Audit } from "./core";
 
-const audit = new Audit({});
-
+const audit = new Audit({ destinations: ["console", "file"] });
 
 audit.Log({
     type: "auth",
