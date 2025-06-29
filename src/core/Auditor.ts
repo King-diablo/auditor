@@ -59,6 +59,7 @@ export class Audit {
     }
 
     private CreateFileLocation = (config: TFileConfig) => {
+        if (!this.destinations.includes("file")) return;
         const fullPath = path.resolve(config.folderName);
         if (!fs.existsSync(fullPath)) {
             fs.mkdirSync(fullPath, { recursive: true });

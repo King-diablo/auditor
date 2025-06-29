@@ -1,1 +1,2 @@
-export * from "./Auditor";
+import { Audit } from "./Auditor";
+export { Audit };
