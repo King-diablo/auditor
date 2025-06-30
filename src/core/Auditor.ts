@@ -2,6 +2,8 @@ import path from "path";
 import { TAuditOptions, TEvent, TFileConfig, } from "../types/type";
 import chalk from "chalk";
 import fs from "fs";
+import { errorLogger, requestLogger } from "../middleware";
+
 export class Audit {
     private logger: any;
     private destinations: string[];
@@ -56,6 +58,14 @@ export class Audit {
 
         this.CreateFileLocation(this.fileConfig);
 
+    }
+
+    RequestLogger() {
+        return requestLogger(this.logger);
+    }
+
+    ErrorLogger() {
+        return errorLogger(this.logger);
     }
 
     private CreateFileLocation = (config: TFileConfig) => {

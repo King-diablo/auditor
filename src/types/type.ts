@@ -37,7 +37,7 @@ type TMessages = {
 
 
 
-type TDestinations = "console" | "file" | "external";
+type TDestinations = "console" | "file" | "remote";
 
 
 

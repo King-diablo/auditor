@@ -1,2 +1,2 @@
 import { Audit } from "./Auditor";
-export { Audit };
+export { Audit as Auditor };

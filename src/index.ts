@@ -1,3 +1,3 @@
-import { Audit } from "./core";
+import { Auditor } from "./core";
 
-export { Audit };
+export { Auditor };
