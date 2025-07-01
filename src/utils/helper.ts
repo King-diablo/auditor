@@ -1,5 +1,5 @@
 import { Request } from 'express';
-import { TAuditOptions } from '../types';
+import { TAuditOptions, TFileConfig, } from '../types';
 
 export const getTimeStamp = () => new Date().toISOString();
 export const getUserId = (req: Request) => {
@@ -13,9 +13,9 @@ export const getUserId = (req: Request) => {
     else "unknown";
 };
 
-export const handleLog = (config: TAuditOptions, saveContent: (content: any) => void, content: any) => {
+export const handleLog = (config: TAuditOptions, fileConfig: TFileConfig, saveContent: (fileConfig: TFileConfig, content: any) => void, content: any) => {
     if (config.destinations?.includes("console"))
-        config.logger.info(content);
+        config.logger?.info(content);
     if (config.destinations?.includes("file"))
-        saveContent(content);
+        saveContent(fileConfig, content);
 };

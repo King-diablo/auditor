@@ -57,9 +57,10 @@ type TKnownEvent = {
 
 export type TAuditOptions = {
     destinations?: TDestinations[];
-    logger?: any;
+    logger?: Logger;
     dbType?: 'mongoose';
     useTimeStamp?: boolean;
+    splitFiles?: boolean;
 };
 
 export type TCustomEvent = {
@@ -73,4 +74,11 @@ export type TEvent = TKnownEvent | TCustomEvent;
 export type TFileConfig = {
     fileName: string,
     folderName: string;
+    fullPath: string;
 };
+export type Logger = {
+    info: (...args: any[]) => void;
+    error: (...args: any[]) => void;
+    warn: (...args: any[]) => void;
+}
+

@@ -5,9 +5,58 @@ A lightweight and customizable audit logger for Node.js applications. Auditor pr
 
 ---
 
+## 📦 Installation
+
+```bash
+npm install @kingdiablo/auditor
+```
+
+You'll also need your preferred logger and optionally an ORM:
+
+```bash
+npm install winston mongoose
+```
+
+---
+
+## 📐 Basic Usage
+
+
+```ts
+import { Auditor } from '@kingdiablo/auditor';
+import express from 'express';
+import winston from 'winston';
+
+const logger = winston.createLogger({
+  transports: [new winston.transports.Console()],
+});
+
+const audit = new Auditor({
+  logger,
+  destinations: ['console', 'file'],
+  dbType: 'mongoose',
+});
+
+const app = express();
+
+app.use(audit.RequestLogger());
+app.use(audit.ErrorLogger());
+
+// Custom business event log
+audit.Log({
+  type: 'auth',
+  action: 'login',
+  message: 'User 123 attempted to log in',
+});
+```
+
+---
+
+
 ## 📄 Configuring File Logging (fileConfig)
 
 If you want to customize the file logging location or filename, use the `FileConfig` method after creating your Auditor instance. This is useful if you want to store logs in a specific folder or use a custom log file name.
+
 
 ```ts
 const audit = new Auditor({
@@ -34,7 +83,7 @@ If you do not call `FileConfig`, logs will be written to `./audit/audit.log` by 
 You can create an Auditor instance with zero configuration for quick prototyping or testing:
 
 ```ts
-import { Auditor } from 'auditor';
+import { Auditor } from '@kingdiablo/auditor';
 
 const audit = new Auditor();
 ```
@@ -64,51 +113,7 @@ const audit = new Auditor({
 
 ---
 
-## 📦 Installation
 
-```bash
-npm install auditor
-```
-
-You'll also need your preferred logger and optionally an ORM:
-
-```bash
-npm install winston mongoose
-```
-
----
-
-## 📐 Basic Usage
-
-```ts
-import { Auditor } from 'auditor';
-import express from 'express';
-import winston from 'winston';
-
-const logger = winston.createLogger({
-  transports: [new winston.transports.Console()],
-});
-
-const audit = new Auditor({
-  logger,
-  destinations: ['console', 'file'],
-  dbType: 'mongoose',
-});
-
-const app = express();
-
-app.use(audit.RequestLogger());
-app.use(audit.ErrorLogger());
-
-// Custom business event log
-audit.Log({
-  type: 'auth',
-  action: 'login',
-  message: 'User 123 attempted to log in',
-});
-```
-
----
 
 ## ⚙ Configuration Options
 
