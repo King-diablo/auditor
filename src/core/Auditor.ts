@@ -3,11 +3,14 @@ import { TAuditOptions, TEvent, TFileConfig, } from "../types/type";
 import chalk from "chalk";
 import fs from "fs";
 import { errorLogger, requestLogger } from "../middleware";
+import { getTimeStamp } from "../utils";
+
+
+//TODO fix the request logger and error logger
+//TODO add option to split up logs
+//TODO refactor
 
 export class Audit {
-    private logger: any;
-    private destinations: string[];
-    private db?: string;
     private useTimeStamp: boolean = true;
     private logFilePath: string = "";
     private fileConfig: TFileConfig = {
@@ -15,45 +18,56 @@ export class Audit {
         folderName: "audit"
     }
 
+    private config: TAuditOptions = {
+        dbType: "mongoose",
+        destinations: ["console"],
+        logger: console,
+        useTimeStamp: true,
+    }
+
     constructor(private options?: TAuditOptions) {
-        this.logger = options?.logger || console;
-        this.destinations = options?.destinations || ["console"];
-        this.db = options?.dbType;
-        this.useTimeStamp = options?.useTimeStamp ?? true;
+        this.config = {
+            ...options,
+            logger: options?.logger || console,
+            dbType: options?.dbType || "mongoose",
+            destinations: options?.destinations || ["console"],
+            useTimeStamp: options?.useTimeStamp || true,
+        }
         this.CreateFileLocation(this.fileConfig);
-        this.logger.info(chalk.green("Audit config set successfully"));
+        this.config.logger.info(chalk.green("Audit config set successfully"));
     }
 
 
     Log(event: TEvent) {
-        const item = this.useTimeStamp ? { ...event, timeStamp: new Date().toISOString() } : { ...event };
-        if (this.destinations.includes("console")) {
-            this.logger.info(item);
+        const item = this.useTimeStamp ? { ...event, timeStamp: getTimeStamp() } : { ...event };
+        if (this.config.destinations?.includes("console")) {
+            this.config.logger.info(item);
         }
 
-        if (this.destinations.includes("file")) {
+        if (this.config.destinations?.includes("file")) {
             if (!this.logFilePath) {
-                this.logger.error(chalk.red("Unable to locate file path"));
+                this.config.logger.error(chalk.red("Unable to locate file path"));
                 return;
             }
-            fs.appendFileSync(this.logFilePath, JSON.stringify(item, null, 4) + '\n', { encoding: "utf-8" });
+            this.SaveToFile(item);
         }
 
     }
 
     FileConfig(config?: TFileConfig) {
 
-        if (!this.destinations.includes("file")) {
-            this.logger.warn(chalk.yellowBright("You need to add file to destinations for this to work properly"));
+        if (!this.config.destinations?.includes("file")) {
+            this.config.logger.warn(chalk.yellowBright("You need to add file to destinations for this to work properly"));
             return;
         }
         const folder = config?.folderName ?? "audit";
-        const fileName = config?.fileName ? `${config.fileName}.log` : "audit.log";
+        const baseFileName = config?.fileName ?? "audit";
+        const fileName = baseFileName.endsWith(".log") ? baseFileName : `${baseFileName}.log`;
 
         this.fileConfig = {
-            folderName: folder,
-            fileName: fileName,
             ...config,
+            folderName: folder,
+            fileName,
         };
 
         this.CreateFileLocation(this.fileConfig);
@@ -61,15 +75,15 @@ export class Audit {
     }
 
     RequestLogger() {
-        return requestLogger(this.logger);
+        return requestLogger(this.config, this.SaveToFile);
     }
 
     ErrorLogger() {
-        return errorLogger(this.logger);
+        return errorLogger(this.config, this.SaveToFile);
     }
 
     private CreateFileLocation = (config: TFileConfig) => {
-        if (!this.destinations.includes("file")) return;
+        if (!this.config.destinations?.includes("file")) return;
         const fullPath = path.resolve(config.folderName);
         if (!fs.existsSync(fullPath)) {
             fs.mkdirSync(fullPath, { recursive: true });
@@ -77,4 +91,8 @@ export class Audit {
 
         this.logFilePath = path.join(fullPath, config.fileName);
     }
+
+    private SaveToFile = (content: any) => {
+        fs.appendFileSync(this.logFilePath, JSON.stringify(content, null, 4) + '\n', { encoding: "utf-8" });
+    };
 }

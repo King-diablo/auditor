@@ -17,7 +17,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-.log
+*.log
 
 # OS
 .DS_Store
@@ -36,3 +36,5 @@ Thumbs.db
 # Coverage / test output
 coverage/
 *.lcov
+
+

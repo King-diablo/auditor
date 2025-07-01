@@ -14,16 +14,23 @@
   },
   "scripts": {
     "build": "tsup",
-    "start": "node src/index.ts"
+    "dev": "tsx src/index.ts"
   },
   "files": [
     "dist",
     "README.md"
   ],
-  "keywords": [],
+  "keywords": [
+    "audit",
+    "logger",
+    "express",
+    "middleware",
+    "typescript",
+    "audit-log",
+    "nodejs"
+  ],
   "author": "kingdiablo",
   "license": "MIT",
-  "type": "commonjs",
   "devDependencies": {
     "@types/express": "^5.0.3",
     "@types/node": "^24.0.7",
@@ -32,5 +39,9 @@
   },
   "dependencies": {
     "chalk": "^5.4.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/King-diablo/auditor"
   }
 }
