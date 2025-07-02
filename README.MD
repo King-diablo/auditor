@@ -53,9 +53,15 @@ audit.Log({
 ---
 
 
-## 📄 Configuring File Logging (fileConfig)
 
-If you want to customize the file logging location or filename, use the `FileConfig` method after creating your Auditor instance. This is useful if you want to store logs in a specific folder or use a custom log file name.
+## 📄 Configuring File Logging (SetFileConfig)
+
+To customize the file logging location or filename, use the `SetFileConfig` method after creating your Auditor instance. This is useful if you want to store logs in a specific folder or use a custom log file name.
+
+**Requirements:**
+- The `file` destination must be enabled in your Auditor config.
+- `SetFileConfig` will not work if `splitFiles` is set to `true`.
+
 
 
 ```ts
@@ -65,7 +71,7 @@ const audit = new Auditor({
 
 // Configure file logging location and filename
 // This will store logs in './logs/my-audit.log'
-audit.FileConfig({
+audit.SetFileConfig({
   folderName: 'logs',
   fileName: 'my-audit', // Do not include .log extension; it will be added automatically
 });
@@ -74,7 +80,7 @@ audit.FileConfig({
 - `folderName`: The folder where logs will be stored (default: `audit`)
 - `fileName`: The name of the log file (default: `audit`)
 
-If you do not call `FileConfig`, logs will be written to `./audit/audit.log` by default.
+If you do not call `SetFileConfig`, logs will be written to `./audit/audit.log` by default.
 
 ---
 
@@ -234,18 +240,22 @@ The request logger will then include the userId in the log entry if present. Adj
 
 ---
 
-## 🧭 Roadmap
+
+## 🧭 Roadmap & Planned Features
 
 - [x] Core audit logger class
 - [x] Request and error middleware
 - [x] File-based JSON logging
-- [ ] Database audit — log database operations such as create, update, delete, and find. This feature tracks and records changes or accesses to your data for auditing purposes.
+- [ ] **Database audit** — log database operations such as create, update, delete, and find. This feature will track and record changes or accesses to your data for auditing purposes.
+    - Planned support: Mongoose (MongoDB), Prisma (PostgreSQL, MySQL, SQLite, SQL Server, MongoDB), Sequelize (PostgreSQL, MySQL, MariaDB, SQLite, SQL Server)
+- [ ] **Remote logging transport** — send audit logs to remote destinations (e.g., log aggregators, cloud storage)
+- [ ] More configuration options: log rotation, custom transports
 
-    **Supported:**
-    - Mongoose (MongoDB)
-    - Prisma (PostgreSQL, MySQL, SQLite, SQL Server, MongoDB)
-    - Sequelize (PostgreSQL, MySQL, MariaDB, SQLite, SQL Server)
-- [ ] Remote logging transport support
+---
+
+## 📋 Changelog
+
+See the [CHANGELOG.md](./CHANGELOG.md) for a detailed list of releases, new features, bug fixes, and planned improvements.
 
 ---
 
