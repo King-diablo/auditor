@@ -1,9 +1,9 @@
-import path from "path";
-import { TAuditOptions, TEvent, TFileConfig, } from "../types/type";
 import chalk from "chalk";
-import fs from "fs";
+import { Schema } from "mongoose";
+import { auditModel, checkForMongodb } from "../database/mongodb";
 import { errorLogger, requestLogger } from "../middleware";
-import { getTimeStamp } from "../utils";
+import { TAuditOptions, TEvent, TFileConfig, } from "../types/type";
+import { createFile, getTimeStamp, saveToFile } from "../utils";
 
 
 export class Audit {
@@ -16,6 +16,11 @@ export class Audit {
         },
         {
             fileName: "request.log",
+            folderName: "audits",
+            fullPath: "",
+        },
+        {
+            fileName: "db.log",
             folderName: "audits",
             fullPath: "",
         },
@@ -34,7 +39,7 @@ export class Audit {
 
 
     private config: TAuditOptions = {
-        dbType: "mongoose",
+        dbType: "none",
         destinations: ["console"],
         logger: console,
         useTimeStamp: true,
@@ -57,7 +62,7 @@ export class Audit {
         this.config = {
             ...options,
             logger: options?.logger || console,
-            dbType: options?.dbType || "mongoose",
+            dbType: options?.dbType || "none",
             destinations: options?.destinations || ["console"],
             useTimeStamp: options?.useTimeStamp ?? true,
             splitFiles: options?.splitFiles ?? false,
@@ -81,6 +86,12 @@ export class Audit {
         }
         this.CreateFileLocation(this.fileConfig);
         this.isInitialized = true;
+
+        if (this.config.dbType === "mongoose") {
+            const result = checkForMongodb(this.config);
+            if (!result) return;
+        }
+
         this.config.logger?.info(chalk.green("Audit config set successfully"));
     }
 
@@ -111,12 +122,28 @@ export class Audit {
 
             if (this.config.splitFiles) {
                 const actionFile = this.defaultFileConfigs.find(x => x.fileName === "action.log") as TFileConfig;
-                this.SaveToFile(actionFile, item);
+                saveToFile(this.config, actionFile, item);
             } else {
-                this.SaveToFile(this.fileConfig, item);
+                saveToFile(this.config, this.fileConfig, item);
             }
         }
 
+    }
+
+    /**
+     * Audits a given schema model by invoking the `auditModel` function with the current configuration,
+     * a generated timestamp, and the provided schema.
+     *
+     * @template T - The type of the schema being audited.
+     * @param schema - The schema object to be audited.
+     */
+    AuditModel<T>(schema: Schema<T>) {
+        if (this.config.splitFiles) {
+            const dbFile = this.defaultFileConfigs.find(x => x.fileName === "db.log") as TFileConfig;
+            auditModel(this.config, schema, dbFile);
+            return;
+        }
+        auditModel(this.config, schema, this.fileConfig);
     }
 
     /**
@@ -168,9 +195,9 @@ export class Audit {
     RequestLogger() {
         if (this.config.splitFiles) {
             const requestFile = this.defaultFileConfigs.find(x => x.fileName === "request.log") as TFileConfig;
-            return requestLogger(this.config, requestFile, this.SaveToFile);
+            return requestLogger(this.config, requestFile);
         }
-        return requestLogger(this.config, this.fileConfig, this.SaveToFile);
+        return requestLogger(this.config, this.fileConfig);
     }
 
     /**
@@ -185,9 +212,9 @@ export class Audit {
     ErrorLogger() {
         if (this.config.splitFiles) {
             const errorFile = this.defaultFileConfigs.find(x => x.fileName === "error.log") as TFileConfig;
-            return errorLogger(this.config, errorFile, this.SaveToFile);
+            return errorLogger(this.config, errorFile);
         }
-        return errorLogger(this.config, this.fileConfig, this.SaveToFile);
+        return errorLogger(this.config, this.fileConfig);
     }
 
 
@@ -205,13 +232,7 @@ export class Audit {
 
 
     private GenerateFile = (config: TFileConfig) => {
-        const fullPath = path.join(process.cwd(), config.folderName);
-        if (!fs.existsSync(fullPath)) {
-            fs.mkdirSync(fullPath, { recursive: true });
-        }
-
-
-        const dir = path.join(fullPath, config.fileName);
+        const dir = createFile(config);
         config.fullPath = dir;
         this.logFilePath = dir;
         this.defaultFileConfigs = this.defaultFileConfigs.map(item => {
@@ -220,12 +241,5 @@ export class Audit {
             }
             return item;
         });
-    };
-    private SaveToFile = (config: TFileConfig, content: any) => {
-        try {
-            fs.appendFileSync(config.fullPath, JSON.stringify(content, null, 4) + '\n', { encoding: "utf-8" });
-        } catch (error) {
-            this.config.logger?.error(chalk.red("Failed to save log to file"));
-        }
     };
 }

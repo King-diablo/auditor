@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { getTimeStamp, getUserId, handleLog } from '../utils';
-import { TAuditOptions, TFileConfig } from '../types';
+import { TAuditOptions, TFileConfig, TSaveContext } from '../types';
 
-export const errorLogger = (config: TAuditOptions, fileConfig: TFileConfig, saveContent: (config: TFileConfig, content: any) => void) => {
+export const errorLogger = (config: TAuditOptions, fileConfig: TFileConfig) => {
     return (err: any, req: Request, res: Response, next: NextFunction) => {
         (res as any)._suppressAudit = true;
         const user = getUserId(req);
@@ -26,7 +26,7 @@ export const errorLogger = (config: TAuditOptions, fileConfig: TFileConfig, save
             ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {})
         };
 
-        handleLog(config, fileConfig, saveContent, content);
+        handleLog(config, fileConfig, content);
 
         next(err); // pass to default error handler
     };

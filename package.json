@@ -36,15 +36,24 @@
   "devDependencies": {
     "@types/express": "^5.0.3",
     "@types/node": "^24.0.7",
+    "mongoose": "^8.16.1",
     "tsup": "^8.5.0",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"
+  },
+  "peerDependencies": {
+    "mongoose": "8.16.1"
+  },
+  "peerDependenciesMeta": {
+    "mongoose": {
+      "optional": true
+    }
   },
   "dependencies": {
     "chalk": "^5.4.1"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/King-diablo/auditor.git"
+    "url": "git+https://github.com/King-diablo/auditor.git"
   }
 }
