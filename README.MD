@@ -1,9 +1,20 @@
 
+
 # 🛡️ Auditor
 
-A lightweight and customizable audit logger for Node.js applications. Auditor provides request and error logging middleware for Express, type-safe business event logging, and flexible log destinations (console, file, remote). Easily integrate with your preferred logger (e.g., Winston, Pino) and database ORM (e.g., Mongoose).
+A lightweight and customizable audit logger for Node.js applications. Auditor provides request and error logging middleware for Express, type-safe business event logging, flexible log destinations (console, file, remote), and **automatic database audit logging for Mongoose (MongoDB)**. Easily integrate with your preferred logger (e.g., Winston, Pino) and database ORM (e.g., Mongoose).
 
 ---
+
+## 🚨 What's New in 0.2.0
+
+- **Mongoose (MongoDB) support:** Automatic audit logging for create, update, delete, and find operations on your Mongoose models.
+- **User utilities:** Easily capture userId, endpoint, and IP for every log entry.
+- **Split file logging:** Log requests, errors, DB actions, and business events to separate files with `splitFiles: true`.
+- **Improved configuration:** More flexible options for file logging and log destinations.
+
+---
+
 
 ## 📦 Installation
 
@@ -19,6 +30,7 @@ npm install winston mongoose
 
 ---
 
+
 ## 📐 Basic Usage
 
 
@@ -31,10 +43,11 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
 
+
 const audit = new Auditor({
   logger,
   destinations: ['console', 'file'],
-  dbType: 'mongoose',
+  dbType: 'mongoose', // Enables MongoDB audit logging
 });
 
 const app = express();
@@ -42,15 +55,28 @@ const app = express();
 app.use(audit.RequestLogger());
 app.use(audit.ErrorLogger());
 
+
 // Custom business event log
 audit.Log({
   type: 'auth',
   action: 'login',
   message: 'User 123 attempted to log in',
 });
+
+// ---
+
+// Database audit logging for Mongoose
+import mongoose, { Schema } from 'mongoose';
+
+const userSchema = new Schema({ name: String });
+audit.AuditModel(userSchema); // Adds audit hooks to the schema
+const User = mongoose.model('User', userSchema);
+
+// Now, all create, update, delete, and find operations on User will be logged automatically!
 ```
 
 ---
+
 
 
 
@@ -84,6 +110,7 @@ If you do not call `SetFileConfig`, logs will be written to `./audit/audit.log` 
 
 ---
 
+
 ## 🛠️ Simple Auditor Configuration
 
 You can create an Auditor instance with zero configuration for quick prototyping or testing:
@@ -96,7 +123,15 @@ const audit = new Auditor();
 
 This will use the default logger (`console`), log to the console, and use default settings.
 
-You can also pass options to customize the logger, destinations, database type, and timestamp usage:
+
+You can also pass options to customize the logger, destinations, database type, timestamp usage, and **split file logging**:
+
+```ts
+const audit = new Auditor({
+  destinations: ['console', 'file'],
+  splitFiles: true, // Logs to error.log, request.log, db.log, and action.log in the 'audits' folder
+});
+```
 
 ```ts
 const audit = new Auditor({
@@ -109,7 +144,12 @@ const audit = new Auditor({
 
 ---
 
+
 ## 🚀 Features
+
+- **Automatic MongoDB audit logging** (Mongoose): Track create, update, delete, and find operations on your models.
+- **User context utilities:** Capture userId, endpoint, and IP for every log entry.
+- **Split file logging:** Separate logs for errors, requests, DB actions, and business events.
 
 - Request & error middleware for Express
 - Type-safe business event logging with IntelliSense
@@ -121,6 +161,7 @@ const audit = new Auditor({
 
 
 
+
 ## ⚙ Configuration Options
 
 | Option         | Type      | Description                                            |
@@ -129,8 +170,15 @@ const audit = new Auditor({
 | `destinations` | string[]  | Where to send logs (`console`, `file`, `remote`)       |
 | `dbType`       | string    | Supported DBs: `'mongoose'`                            |
 | `useTimeStamp` | boolean   | Include timestamp in logs (default: `true`)            |
+| `splitFiles`   | boolean   | Log to separate files for errors, requests, db, actions|
+
+**Split file logging:**
+- When `splitFiles: true`, logs are written to `audits/error.log`, `audits/request.log`, `audits/db.log`, and `audits/action.log`.
+- Otherwise, all logs go to a single file (default: `audit/audit.log`).
+
 
 ---
+
 
 
 ## 🪵 Business Event Logging (`Log`)
@@ -241,13 +289,15 @@ The request logger will then include the userId in the log entry if present. Adj
 ---
 
 
+
 ## 🧭 Roadmap & Planned Features
 
 - [x] Core audit logger class
 - [x] Request and error middleware
 - [x] File-based JSON logging
-- [ ] **Database audit** — log database operations such as create, update, delete, and find. This feature will track and record changes or accesses to your data for auditing purposes.
-    - Planned support: Mongoose (MongoDB), Prisma (PostgreSQL, MySQL, SQLite, SQL Server, MongoDB), Sequelize (PostgreSQL, MySQL, MariaDB, SQLite, SQL Server)
+- [x] **Database audit** — log database operations such as create, update, delete, and find for Mongoose (MongoDB). Prisma and Sequelize support planned.
+    - Supported: Mongoose (MongoDB)
+    - Planned: Prisma (PostgreSQL, MySQL, SQLite, SQL Server, MongoDB), Sequelize (PostgreSQL, MySQL, MariaDB, SQLite, SQL Server)
 - [ ] **Remote logging transport** — send audit logs to remote destinations (e.g., log aggregators, cloud storage)
 - [ ] More configuration options: log rotation, custom transports
 

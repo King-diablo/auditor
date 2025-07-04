@@ -1,21 +1,41 @@
 # Changelog
 
+
 # Table of Contents
 
 -   [Unreleased](#unreleased)
+-   [auditor 0.2.0](#auditor-020---2025-07-03)
 -   [auditor 0.1.1](#auditor-011---2025-07-02)
 -   [auditor 0.1.0](#auditor-010---2025-06-30)
 
 All notable changes and fixes to this project are documented in this file.
 
+
 ## [Unreleased]
 
 ### Planned
 
--   Support for MongoDB audit logging (database operations: create, update, delete, find)
 -   Support for remote logging transport (send audit logs to remote destinations)
 -   Support for database audit with Prisma and Sequelize
 -   More configuration options: log rotation, custom transports
+
+## auditor 0.2.0 - Pending
+
+### Added
+
+-   **Mongoose (MongoDB) support**: Audit logging for MongoDB operations using Mongoose.
+-   **Enhanced logging functionality**: Improvements to request and error logging, including better user context and stack traces.
+-   **User utilities**: Added helpers for extracting and handling user information in logs.
+
+### Changed
+
+-   Updated `Auditor.ts` core logic for extensibility and MongoDB integration.
+-   Refactored middleware and helper utilities for improved maintainability.
+-   Bumped package version to 0.2.0.
+
+### Fixed
+
+-   Various bug fixes and improvements across middleware and database modules.
 
 ## auditor 0.1.1 - 2025-07-02 [[GitHub Release](https://github.com/King-diablo/auditor/releases/tag/v0.1.1)]
 
