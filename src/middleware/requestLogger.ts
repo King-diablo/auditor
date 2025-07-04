@@ -9,10 +9,11 @@ export const requestLogger = (config: TAuditOptions, fileConfig: TFileConfig) =>
         const start = Date.now();
         const route = req.originalUrl;
         const ip = req.ip ?? "unknown";
+        const userAgent = req.headers['user-agent'] || '';
         const user = getUserId(req);
         const id = (typeof user === "string") ? user : user ? user?.id : "unknown";
 
-        userProfile.BuildProfile(id, route, ip);
+        userProfile.BuildProfile(id, route, ip, userAgent);
 
         res.on('finish', () => {
             const duration = Date.now() - start;
@@ -27,7 +28,7 @@ export const requestLogger = (config: TAuditOptions, fileConfig: TFileConfig) =>
                     statusCode: req.statusCode || 500,
                     ip,
                     route,
-                    userAgent: req.headers['user-agent'],
+                    userAgent,
                     ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),
                 };
                 handleLog(config, fileConfig, content);
@@ -42,7 +43,7 @@ export const requestLogger = (config: TAuditOptions, fileConfig: TFileConfig) =>
                 route: route,
                 statusMessage: req.statusMessage || "success",
                 ip,
-                userAgent: req.headers['user-agent'],
+                userAgent,
                 userId: id,
                 ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {})
 

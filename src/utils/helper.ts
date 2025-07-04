@@ -22,10 +22,11 @@ export const getUserId = (req: Request) => {
 };
 
 export const handleLog = (config: TAuditOptions, fileConfig: TFileConfig, content: any) => {
+
     if (config.destinations?.includes("console"))
-        config.logger?.info(content);
+        logAuditEvent(config, content);
     if (config.destinations?.includes("file"))
-        saveToFile(config, fileConfig, content);
+        logAuditEvent(config, content, fileConfig);
 };
 
 export const saveToFile = (config: TAuditOptions, file: TFileConfig, content: any) => {
@@ -45,4 +46,12 @@ export const createFile = (config: TFileConfig) => {
     const dir = path.join(fullPath, config.fileName);
 
     return dir;
+};
+
+export const logAuditEvent = (config: TAuditOptions, content: any, file?: TFileConfig) => {
+    if (file) {
+        saveToFile(config, file, content);
+        return;
+    }
+    config.logger?.info(content);
 };

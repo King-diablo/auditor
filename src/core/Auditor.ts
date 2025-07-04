@@ -3,7 +3,7 @@ import { Schema } from "mongoose";
 import { auditModel, checkForMongodb } from "../database/mongodb";
 import { errorLogger, requestLogger } from "../middleware";
 import { TAuditOptions, TEvent, TFileConfig, } from "../types/type";
-import { createFile, getTimeStamp, saveToFile } from "../utils";
+import { createFile, getTimeStamp, logAuditEvent } from "../utils";
 
 
 export class Audit {
@@ -92,7 +92,7 @@ export class Audit {
             if (!result) return;
         }
 
-        this.config.logger?.info(chalk.green("Audit config set successfully"));
+        this.config.logger?.info(chalk.green("Default Audit config set successfully"));
     }
 
     /**
@@ -110,22 +110,23 @@ export class Audit {
      */
     Log(event: TEvent) {
         const item = this.config.useTimeStamp ? { ...event, timeStamp: getTimeStamp() } : { ...event };
+
         if (this.config.destinations?.includes("console")) {
+            logAuditEvent(this.config, item);
             this.config.logger?.info(item);
         }
 
         if (this.config.destinations?.includes("file")) {
+
             if (!this.logFilePath) {
                 this.config.logger?.error(chalk.red("Unable to locate file path"));
                 return;
             }
 
-            if (this.config.splitFiles) {
-                const actionFile = this.defaultFileConfigs.find(x => x.fileName === "action.log") as TFileConfig;
-                saveToFile(this.config, actionFile, item);
-            } else {
-                saveToFile(this.config, this.fileConfig, item);
-            }
+            const actionFile = this.defaultFileConfigs.find(x => x.fileName === "action.log") as TFileConfig;
+            const file = this.config.splitFiles ? actionFile : this.fileConfig;
+
+            logAuditEvent(this.config, item, file);
         }
 
     }

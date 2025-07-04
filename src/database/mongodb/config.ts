@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { Document, Schema } from "mongoose";
-import { TAuditOptions, TFileConfig, TSaveContext } from "../../types";
-import { getTimeStamp, saveToFile } from "../../utils";
+import { TAuditOptions, TFileConfig } from "../../types";
+import { getTimeStamp, logAuditEvent } from "../../utils";
 import { userProfile } from "../../utils/user";
 
 
@@ -53,6 +53,10 @@ export const checkForMongodb = (config: TAuditOptions) => {
  */
 export const auditModel = <T>(config: TAuditOptions, schema: Schema<T>, file: TFileConfig) => {
 
+    if (config.dbType === "none") {
+        config.logger?.error(chalk.yellow("Cannot audit db while DB type is set to none"));
+        return;
+    }
     if (!hasMongoose) {
         config.logger?.error(chalk.red("Please install mongoose to use audit"));
         return;
@@ -67,28 +71,18 @@ export const auditModel = <T>(config: TAuditOptions, schema: Schema<T>, file: TF
 };
 
 const handleSaveSchema = (schema: Schema, config: TAuditOptions) => {
+    const log = generateLog(config);
+
     schema.pre('save', function (next) {
         (this as any)._wasNew = this.isNew;
         next();
     });
 
     schema.post("save", function (doc: AuditDoc, next) {
-        const collectionName = doc.collection.name;
-        const content = {
-            type: "db",
-            action: doc._wasNew ? "create" : "update",
-            model: doc.constructor.modelName,
-            collection: collectionName,
-            documentId: doc.id,
-            timeStamp: getTimeStamp()
-        };
-        if (config.destinations?.includes("console"))
-            config.logger?.info(content);
+        const modelName = doc.constructor.modelName;
+        const message = `doc was ${doc._wasNew ? "created" : "updated"}`;
+        log("save", modelName, {}, message);
 
-        if (!dbFile) return;
-
-        if (config.destinations?.includes("file"))
-            saveToFile(config, dbFile, content);
         next();
     });
 };
@@ -166,14 +160,15 @@ const generateLog = (config: TAuditOptions) => {
             userId: userProfile.getUserId(),
             endPoint: userProfile.getEndPoint(),
             ip: userProfile.getIp(),
-            timeStamp: getTimeStamp()
+            userAgent: userProfile.getUserAgent(),
+            timeStamp: getTimeStamp(),
         };
         if (config.destinations?.includes("console"))
-            config.logger?.info(content);
+            logAuditEvent(config, content)
 
         if (!dbFile) return;
 
         if (config.destinations?.includes("file"))
-            saveToFile(config, dbFile, content);
+            logAuditEvent(config, content, dbFile);
     };
 };

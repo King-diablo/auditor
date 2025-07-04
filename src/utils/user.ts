@@ -16,17 +16,20 @@ class UserProfile {
     private userId: string;
     private endPoint: string;
     private ip: string;
+    private userAgent: string;
 
     constructor() {
         this.userId = "";
         this.endPoint = "";
         this.ip = "";
+        this.userAgent = "";
     }
 
-    BuildProfile(id: string, url: string, ip: string) {
+    BuildProfile(id: string, url: string, ip: string, userAgent: string) {
         this.userId = id;
         this.endPoint = url;
         this.ip = ip;
+        this.userAgent = userAgent;
     }
 
     getUserId() {
@@ -37,6 +40,9 @@ class UserProfile {
     }
     getIp() {
         return this.ip;
+    }
+    getUserAgent() {
+        return this.userAgent;
     }
 }
 
