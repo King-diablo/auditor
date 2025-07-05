@@ -13,13 +13,17 @@ All notable changes and fixes to this project are documented in this file.
 
 ## [Unreleased]
 
+
 ### Planned
 
 -   Support for remote logging transport (send audit logs to remote destinations)
 -   Support for database audit with Prisma and Sequelize
 -   More configuration options: log rotation, custom transports
+-   **UI for audit viewing:** A new feature will allow displaying audits via a UI. Users who want to use this must set up their own server to host the UI.
 
-## auditor 0.2.0 - Pending
+
+
+## auditor 0.2.0 - 2025-07-05 [[GitHub Release](https://github.com/King-diablo/auditor/releases/tag/v0.2.0)]
 
 ### Added
 
