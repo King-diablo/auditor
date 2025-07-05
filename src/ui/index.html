@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Audit Dashboard</title>
+		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+		<link rel="stylesheet" href="index.css" />
+	</head>
+	<body>
+		<h1>Audit Logs Dashboard</h1>
+		<div class="controls">
+			<input type="text" id="searchInput" placeholder="Search audit..." />
+			<select id="filterAction">
+				<option value="">All Actions</option>
+				<option value="create">Create</option>
+				<option value="update">Update</option>
+				<option value="delete">Delete</option>
+			</select>
+			<button onclick="exportChart()">Export Chart</button>
+			<button onclick="exportTableToCSV()">Export Table</button>
+			<button onclick="toggleDarkMode()">Toggle Dark Mode</button>
+		</div>
+		<canvas id="auditChart" width="800" height="300"></canvas>
+
+		<table id="auditTable">
+			<thead>
+				<tr>
+					<th>Id</th>
+					<th>Type</th>
+					<th>Action</th>
+					<th>Message</th>
+					<th>EndPoint</th>
+					<th>Timestamp</th>
+					<th>Details</th>
+				</tr>
+			</thead>
+			<tbody></tbody>
+		</table>
+
+		<div id="modal" class="modal hidden">
+			<div class="modal-content">
+				<h3>Stack Trace</h3>
+				<pre id="modalText"></pre>
+				<button id="closeModal">Close</button>
+			</div>
+		</div>
+
+		<script src="./index.js"></script>
+	</body>
+</html>
