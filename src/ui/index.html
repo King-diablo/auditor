@@ -1,51 +1,67 @@
 <!DOCTYPE html>
 <html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Audit Dashboard</title>
-		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-		<link rel="stylesheet" href="index.css" />
-	</head>
-	<body>
-		<h1>Audit Logs Dashboard</h1>
-		<div class="controls">
-			<input type="text" id="searchInput" placeholder="Search audit..." />
-			<select id="filterAction">
-				<option value="">All Actions</option>
-				<option value="create">Create</option>
-				<option value="update">Update</option>
-				<option value="delete">Delete</option>
-			</select>
-			<button onclick="exportChart()">Export Chart</button>
-			<button onclick="exportTableToCSV()">Export Table</button>
-			<button onclick="toggleDarkMode()">Toggle Dark Mode</button>
-		</div>
-		<canvas id="auditChart" width="800" height="300"></canvas>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Audit Log Dashboard</title>
+  <link rel="stylesheet" href="index.css" />
+</head>
+<body>
+  <header>
+    <button id="hamburger" class="hamburger">&#9776;</button>
+    <h1 id="dashboardTitle">Audit Log Dashboard</h1>
+    <button onclick="toggleDarkMode()">🌓</button>
+  </header>
 
-		<table id="auditTable">
-			<thead>
-				<tr>
-					<th>Id</th>
-					<th>Type</th>
-					<th>Action</th>
-					<th>Message</th>
-					<th>EndPoint</th>
-					<th>Timestamp</th>
-					<th>Details</th>
-				</tr>
-			</thead>
-			<tbody></tbody>
-		</table>
+  <nav id="mobileMenu" class="hidden">
+    <ul>
+      <li><button onclick="exportTableToCSV()">Export Table</button></li>
+      <li><button onclick="exportChart()">Export Chart</button></li>
+    </ul>
+  </nav>
 
-		<div id="modal" class="modal hidden">
-			<div class="modal-content">
-				<h3>Stack Trace</h3>
-				<pre id="modalText"></pre>
-				<button id="closeModal">Close</button>
-			</div>
-		</div>
+  <main>
+    <section class="controls">
+      <input type="text" id="searchInput" placeholder="Search logs..." />
+      <select id="filterAction">
+        <option value="">All Actions</option>
+        <option value="create">Create</option>
+        <option value="update">Update</option>
+        <option value="delete">Delete</option>
+        <option value="error">Error</option>
+      </select>
+      <select id="chartType">
+        <option value="bar">Bar</option>
+        <option value="line">Line</option>
+      </select>
+    </section>
 
-		<script src="./index.js"></script>
-	</body>
+    <canvas id="auditChart" height="120"></canvas>
+
+    <table id="auditTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Type</th>
+          <th>Action</th>
+          <th>Message</th>
+          <th>Route</th>
+          <th>Timestamp</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </main>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-content">
+      <span id="closeModal">&times;</span>
+      <div id="modalText"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="index.js"></script>
+</body>
 </html>

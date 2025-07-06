@@ -1,3 +1,5 @@
+let filteredLogs = [];
+
 const auditLogs = [
     {
         id: "standard_001",
@@ -40,6 +42,18 @@ const auditLogs = [
     },
 ];
 
+const hamburger = document.getElementById("hamburger");
+const mobileMenu = document.getElementById("mobileMenu");
+const dashboardTitle = document.getElementById("dashboardTitle");
+
+const actionColorMap = {
+    create: "#4caf50",  // green
+    update: "#2196f3",  // blue
+    delete: "#f44336",  // red
+    error: "#ff9800",   // orange
+    default: "#9e9e9e"  // grey
+};
+
 function renderTable(logs) {
     const tbody = document.querySelector("#auditTable tbody");
     tbody.innerHTML = "";
@@ -58,11 +72,9 @@ function renderTable(logs) {
     });
 }
 
-function viewDetails(stack) {
+function viewDetails(log) {
     const modalText = document.getElementById("modalText");
-    modalText.innerHTML = `
-        <pre style="white-space:pre-wrap;word-break:break-word;">${JSON.stringify(stack, null, 4)}</pre>
-    `;
+    modalText.innerHTML = `<pre>${JSON.stringify(log, null, 4)}</pre>`;
     document.getElementById("modal").classList.remove("hidden");
 }
 
@@ -72,12 +84,16 @@ document.getElementById("closeModal").onclick = () => {
 
 document.getElementById("searchInput").addEventListener("input", filterLogs);
 document.getElementById("filterAction").addEventListener("change", filterLogs);
+document.getElementById("chartType").addEventListener("change", () => {
+    renderChart(filteredLogs.length ? filteredLogs : auditLogs);
+});
+
 
 function filterLogs() {
     const search = document.getElementById("searchInput").value.toLowerCase();
     const action = document.getElementById("filterAction").value;
 
-    const filtered = auditLogs.filter(log => {
+    filteredLogs = auditLogs.filter(log => {
         return (
             (!action || log.action === action) &&
             (log.message.toLowerCase().includes(search) ||
@@ -85,15 +101,16 @@ function filterLogs() {
         );
     });
 
-    renderTable(filtered);
-    renderChart(filtered);
+    renderTable(filteredLogs);
+    renderChart(filteredLogs);
 }
 
-function renderChart(logs) {
+function renderChart(logs, chartType = null) {
+    const selectedType = chartType || document.getElementById("chartType").value || "bar";
     const hours = Array.from({ length: 24 }, (_, h) => `${h.toString().padStart(2, '0')}:00`);
-    const actions = logs.map(x => x.action);
-    const data = actions.reduce((acc, action) => {
-        acc[action] = hours.map(() => 0);
+    const uniqueActions = [...new Set(logs.map(x => x.action))];
+    const data = uniqueActions.reduce((acc, action) => {
+        acc[action] = Array(24).fill(0);
         return acc;
     }, {});
 
@@ -107,19 +124,19 @@ function renderChart(logs) {
     }
 
     const isDark = document.body.classList.contains("dark-mode");
-
     const ctx = document.getElementById("auditChart").getContext("2d");
-    window.auditChartInstance = new Chart(ctx, {
-        type: "bar",
 
+    window.auditChartInstance = new Chart(ctx, {
+        type: selectedType,
         data: {
             labels: hours,
-            datasets: actions.map((action, i) => ({
+            datasets: uniqueActions.map((action) => ({
                 label: action.charAt(0).toUpperCase() + action.slice(1),
                 data: data[action],
-                // borderColor: ["green", "pink", "red"][i],
-                backgroundColor: ["lime", "pink", "green", "red"][i],
-                fill: false
+                backgroundColor: actionColorMap[action] || actionColorMap.default,
+                borderColor: actionColorMap[action] || actionColorMap.default,
+                fill: false,
+                tension: 0.3,
             }))
         },
         options: {
@@ -127,24 +144,16 @@ function renderChart(logs) {
             plugins: { legend: { position: "bottom" } },
             scales: {
                 x: {
-                    ticks: {
-                        color: isDark ? "#f0f0f0" : "#000000"
-                    },
-                    grid: {
-                        color: isDark ? "#444" : "#ccc"
-                    }
+                    ticks: { color: isDark ? "#f0f0f0" : "#000" },
+                    grid: { color: isDark ? "#444" : "#ccc" },
                 },
                 y: {
                     beginAtZero: true,
-                    ticks: {
-                        color: isDark ? "#f0f0f0" : "#000000"
-                    },
-                    grid: {
-                        color: isDark ? "#444" : "#ccc"
-                    }
-                },
+                    ticks: { color: isDark ? "#f0f0f0" : "#000" },
+                    grid: { color: isDark ? "#444" : "#ccc" }
+                }
             }
-        },
+        }
     });
 }
 
@@ -158,13 +167,17 @@ function exportChart() {
 
 function toggleDarkMode() {
     document.body.classList.toggle("dark-mode");
-    renderChart(auditLogs);
+
+    const isDark = document.body.classList.contains("dark-mode");
+    localStorage.setItem("darkMode", isDark ? "true" : "false");
+
+    renderChart(filteredLogs.length ? filteredLogs : auditLogs);
 }
 
 function exportTableToCSV() {
     const rows = Array.from(document.querySelectorAll("#auditTable tr"));
     const csv = rows.map(row =>
-        Array.from(row.children).map(cell => '"' + cell.innerText + '"').join(",")
+        Array.from(row.children).map(cell => `"${cell.innerText}"`).join(",")
     ).join("\n");
 
     const blob = new Blob([csv], { type: "text/csv" });
@@ -174,6 +187,25 @@ function exportTableToCSV() {
     link.click();
 }
 
+
+
+hamburger.addEventListener("click", () => {
+    mobileMenu.classList.toggle("hidden");
+    hamburger.classList.toggle("open");
+
+    dashboardTitle.style.display = mobileMenu.classList.contains("hidden") ? "block" : "none";
+});
+
+function initializeDarkMode() {
+    const isDarkSaved = localStorage.getItem("darkMode");
+    if (isDarkSaved === "true") {
+        document.body.classList.add("dark-mode");
+    }
+};
+
+// 🌙 Check and apply dark mode on load
+initializeDarkMode();
+
+// Initial render
 renderTable(auditLogs);
 renderChart(auditLogs);
-
