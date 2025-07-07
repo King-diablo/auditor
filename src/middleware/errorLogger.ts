@@ -1,8 +1,11 @@
-import { Request, Response, NextFunction } from 'express';
-import { getTimeStamp, getUserId, handleLog } from '../utils';
-import { TAuditOptions, TFileConfig, TSaveContext } from '../types';
+import { NextFunction, Request, Response } from 'express';
+import { AppConfig } from '../core/AppConfigs';
+import { getFileLocation, getTimeStamp, getUserId, handleLog } from '../utils';
 
-export const errorLogger = (config: TAuditOptions, fileConfig: TFileConfig) => {
+export const errorLogger = () => {
+    const config = AppConfig.getAuditOption()!;
+    const file = getFileLocation("error.log");
+
     return (err: any, req: Request, res: Response, next: NextFunction) => {
         (res as any)._suppressAudit = true;
         const user = getUserId(req);
@@ -15,18 +18,18 @@ export const errorLogger = (config: TAuditOptions, fileConfig: TFileConfig) => {
             type: "error",
             action: "request failed",
             method: req.method,
-            statusCode: req.statusCode || 500,
+            statusCode: res.statusCode || 500,
             route: req.originalUrl,
-            statusMessage: req.statusMessage || "Internal Server Error",
+            statusMessage: res.statusMessage || "Internal Server Error",
             ip: req.ip ?? "unknown",
             userAgent: req.headers['user-agent'],
             errorMessage: err.message,
             stack: stackLine,
             userId: (typeof user === "string") ? user : user ? user?.id : "unknown",
-            ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {})
+            ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),
         };
 
-        handleLog(config, fileConfig, content);
+        handleLog(file, content);
 
         next(err); // pass to default error handler
     };

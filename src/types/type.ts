@@ -61,12 +61,20 @@ export type TAuditOptions = {
     dbType?: 'none' | 'mongoose';
     useTimeStamp?: boolean;
     splitFiles?: boolean;
+    captureSystemErrors?: boolean;
 };
 
 export type TCustomEvent = {
     type: Exclude<string, keyof TActionMap>;
     action: string;
     message: string;
+};
+
+export type AuditContentParams = {
+    type: string;
+    action: string;
+    message: string;
+    [key: string]: any;
 };
 
 export type TEvent = TKnownEvent | TCustomEvent;

@@ -1,19 +1,12 @@
 import chalk from "chalk";
-import { Document, Schema } from "mongoose";
-import { TAuditOptions, TFileConfig } from "../../types";
-import { getTimeStamp, logAuditEvent } from "../../utils";
+import { Schema } from "mongoose";
+import { AppConfig } from "../../core/AppConfigs";
+import { getFileLocation, getTimeStamp, logAuditEvent } from "../../utils";
 import { userProfile } from "../../utils/user";
 
 
-interface AuditDoc extends Document {
-    _wasNew?: boolean;
-    constructor: {
-        modelName: string;
-    };
-}
 
 let hasMongoose = false;
-let dbFile: null | TFileConfig;
 
 /**
  * Checks if the "mongoose" package is available in the current environment.
@@ -24,7 +17,9 @@ let dbFile: null | TFileConfig;
  * @param config - The audit options object, which should include a logger for output messages.
  * @returns `true` if "mongoose" is available, otherwise `false`.
  */
-export const checkForMongodb = (config: TAuditOptions) => {
+export const checkForMongodb = () => {
+    const config = AppConfig.getAuditOption()!;
+
     try {
         require.resolve("mongoose");
         config.logger?.info(chalk.green("Mongoose auditing is available"));
@@ -51,8 +46,8 @@ export const checkForMongodb = (config: TAuditOptions) => {
  * - Adds a post-find hook to log "find" actions.
  * - Logs include model name, collection name, document ID, and timestamp.
  */
-export const auditModel = <T>(config: TAuditOptions, schema: Schema<T>, file: TFileConfig) => {
-
+export const auditModel = <T>(schema: Schema<T>) => {
+    const config = AppConfig.getAuditOption()!;
     if (config.dbType === "none") {
         config.logger?.error(chalk.yellow("Cannot audit db while DB type is set to none"));
         return;
@@ -62,33 +57,29 @@ export const auditModel = <T>(config: TAuditOptions, schema: Schema<T>, file: TF
         return;
     }
 
-    if (!dbFile) dbFile = file;
-
-    handleSaveSchema(schema, config);
-    handleFindSchema(schema, config);
-    handleUpdateSchema(schema, config);
-    handleDeletingSchema(schema, config);
+    handleSaveSchema(schema);
+    handleFindSchema(schema);
+    handleUpdateSchema(schema);
+    handleDeletingSchema(schema);
 };
 
-const handleSaveSchema = (schema: Schema, config: TAuditOptions) => {
-    const log = generateLog(config);
+const handleSaveSchema = (schema: Schema) => {
+    const log = generateLog();
 
     schema.pre('save', function (next) {
         (this as any)._wasNew = this.isNew;
         next();
     });
 
-    schema.post("save", function (doc: AuditDoc, next) {
-        const modelName = doc.constructor.modelName;
+    schema.post("save", (doc: any) => {
+        const { modelName } = doc.constructor;
         const message = `doc was ${doc._wasNew ? "created" : "updated"}`;
         log("save", modelName, {}, message);
-
-        next();
     });
 };
 
-const handleFindSchema = (schema: Schema, config: TAuditOptions) => {
-    const log = generateLog(config);
+const handleFindSchema = (schema: Schema) => {
+    const log = generateLog();
 
     schema.post("find", function (docs) {
         const modelName = this.model.collection.name;
@@ -96,22 +87,22 @@ const handleFindSchema = (schema: Schema, config: TAuditOptions) => {
         log("read", modelName, this.getFilter(), message, docs.length);
     });
 
-    schema.post("findOne", function (doc: AuditDoc) {
+    schema.post("findOne", function (doc: any) {
         const modelName = this.model.collection.name;
         const message = `looking for a single ${modelName}`;
         log("read", modelName, this.getFilter(), message);
     });
 };
 
-const handleUpdateSchema = (schema: Schema, config: TAuditOptions) => {
-    const log = generateLog(config);
-    schema.post("updateOne", function (doc: AuditDoc) {
+const handleUpdateSchema = (schema: Schema) => {
+    const log = generateLog();
+    schema.post("updateOne", function (doc: any) {
         const modelName = this.model.collection.name;
         const message = `updating a single ${modelName} doc`;
         log("update", modelName, this.getFilter(), message);
     });
 
-    schema.post("findOneAndUpdate", function (doc: AuditDoc) {
+    schema.post("findOneAndUpdate", function (doc: any) {
         const modelName = this.model.collection.name;
         const message = `finding & updating a single ${modelName} doc`;
         log("update", modelName, this.getFilter(), message);
@@ -121,12 +112,12 @@ const handleUpdateSchema = (schema: Schema, config: TAuditOptions) => {
     schema.post("updateMany", function (docs) {
         const modelName = this.model.collection.name;
         const message = `updating multiple ${modelName} docs`;
-        log("update", modelName, this.getFilter(), message, docs.length);
+        log("update", modelName, this.getFilter(), message, docs.modifiedCount);
     });
 };
 
-const handleDeletingSchema = (schema: Schema, config: TAuditOptions) => {
-    const log = generateLog(config);
+const handleDeletingSchema = (schema: Schema) => {
+    const log = generateLog();
     schema.post("findOneAndDelete", function () {
         const modelName = this.model.collection.name;
         const message = `finding & deleting a single ${modelName} doc`;
@@ -142,33 +133,37 @@ const handleDeletingSchema = (schema: Schema, config: TAuditOptions) => {
     schema.post("deleteMany", function (docs) {
         const modelName = this.model.collection.name;
         const message = `deleting multiple ${modelName} docs`;
-        log("delete", modelName, this.getFilter(), message, docs.length);
+        log("delete", modelName, this.getFilter(), message, docs.deletedCount);
     });
 };
 
 
 type TdbAction = "save" | "read" | "update" | "delete";
-const generateLog = (config: TAuditOptions) => {
+const generateLog = () => {
+    const config = AppConfig.getAuditOption()!;
+
     return (action: TdbAction, modelName: string, filter: any, message: string, length?: number) => {
         const content = {
             type: "db",
             action,
             collection: modelName,
             criteria: filter,
-            ...(length ? { resultCount: length } : {}),
+            ...(length !== undefined ? { resultCount: length } : {}),
             message,
             userId: userProfile.getUserId(),
             endPoint: userProfile.getEndPoint(),
             ip: userProfile.getIp(),
             userAgent: userProfile.getUserAgent(),
-            timeStamp: getTimeStamp(),
+            ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),
         };
         if (config.destinations?.includes("console"))
-            logAuditEvent(config, content)
+            logAuditEvent(content);
+
+        const dbFile = getFileLocation("db.log");
 
         if (!dbFile) return;
 
         if (config.destinations?.includes("file"))
-            logAuditEvent(config, content, dbFile);
+            logAuditEvent(content, dbFile);
     };
 };
