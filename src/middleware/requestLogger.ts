@@ -1,10 +1,13 @@
-import { Request, Response, NextFunction } from 'express';
-import { getTimeStamp, getUserId, handleLog } from '../utils';
-import { TAuditOptions, TFileConfig, TSaveContext } from '../types';
+import { NextFunction, Request, Response } from 'express';
+import { AppConfig } from '../core/AppConfigs';
+import { getFileLocation, getTimeStamp, getUserId, handleLog } from '../utils';
 import { userProfile } from '../utils/user';
 
 
-export const requestLogger = (config: TAuditOptions, fileConfig: TFileConfig) => {
+export const requestLogger = () => {
+    const config = AppConfig.getAuditOption()!;
+    const file = getFileLocation("request.log");
+
     return (req: Request, res: Response, next: NextFunction) => {
         const start = Date.now();
         const route = req.originalUrl;
@@ -25,13 +28,14 @@ export const requestLogger = (config: TAuditOptions, fileConfig: TFileConfig) =>
                     outcome: "failure",
                     duration,
                     method: req.method,
-                    statusCode: req.statusCode || 500,
+                    statusCode: res.statusCode || 500,
                     ip,
                     route,
                     userAgent,
+                    userId: id,
                     ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),
                 };
-                handleLog(config, fileConfig, content);
+                handleLog(file, content);
                 return;
             }
             const content = {
@@ -39,16 +43,15 @@ export const requestLogger = (config: TAuditOptions, fileConfig: TFileConfig) =>
                 action: "incoming request",
                 duration,
                 method: req.method,
-                statusCode: req.statusCode || 200,
+                statusCode: res.statusCode || 200,
                 route: route,
-                statusMessage: req.statusMessage || "success",
+                statusMessage: res.statusMessage || "success",
                 ip,
                 userAgent,
                 userId: id,
                 ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {})
-
             };
-            handleLog(config, fileConfig, content);
+            handleLog(file, content);
         });
         next();
     };
