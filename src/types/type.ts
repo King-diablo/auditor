@@ -1,3 +1,9 @@
+import type { NextFunction, Request, Response } from 'express';
+
+import type { Context, Next as KoaNext } from 'koa';
+import type { FastifyReply, HookHandlerDoneFunction } from 'fastify';
+import { ExtendedFastifyRequest } from '../utils/interface';
+
 type TActionMap = {
     auth: "login" | "logout" | "signup" | "password_reset" | "password_update" |
     "token_refreshed" | "session_expired" | "2fa_requested" | "2fa_verified" |
@@ -55,10 +61,11 @@ type TKnownEvent = {
     : never
 }[keyof TActionMap];
 
-export type TAuditOptions = {
+export type TAuditOptions<F extends Framework> = {
     destinations?: TDestinations[];
     logger?: Logger;
     dbType?: 'none' | 'mongoose';
+    framework?: F;  // "express" | "fastify" | "koa", // | "hapi" | "restify"
     useTimeStamp?: boolean;
     splitFiles?: boolean;
     captureSystemErrors?: boolean;
@@ -84,6 +91,32 @@ export type TFileConfig = {
     folderName: string;
     fullPath: string;
 };
+
+
+export type ExpressLogger = (req: Request, res: Response, next: NextFunction) => void;
+export type KoaLogger = (ctx: Context, next: KoaNext) => Promise<void>;
+export type FastifyLogger = {
+    onRequest: (request: ExtendedFastifyRequest, reply: FastifyReply, done: HookHandlerDoneFunction) => void;
+    onResponse: (request: ExtendedFastifyRequest, reply: FastifyReply, done: HookHandlerDoneFunction) => void;
+};
+
+export type SupportedLoggersRequest = {
+    express: ExpressLogger;
+    koa: KoaLogger;
+    fastify: FastifyLogger;
+    // hapi: () => {},
+    // restify: () => {},
+};
+export type SupportedLoggersError = {
+    express: ExpressLogger;
+    koa: KoaLogger;
+    fastify: FastifyLogger;
+    // hapi: () => {},
+    // restify: () => {},
+};
+
+export type Framework = keyof SupportedLoggersRequest;
+
 export type Logger = {
     info: (...args: any[]) => void;
     error: (...args: any[]) => void;

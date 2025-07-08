@@ -116,6 +116,19 @@ const handleUpdateSchema = (schema: Schema) => {
     });
 };
 
+/**
+* Sets up Mongoose schema middleware to log deletion operations.
+* @example
+* handleDeletingSchema(userSchema)
+* // No return value; sets up post-hooks on provided schema
+* @param {Schema} schema - Represents the Mongoose schema on which to add audit logging for delete operations.
+* @returns {void} No return value; sets up middleware on the provided schema.
+* @description
+*   - Utilizes Mongoose post-hooks to capture delete operations like `findOneAndDelete`, `deleteOne`, and `deleteMany`.
+*   - Logs details of delete operations such as model name, filter criteria, action type, and affected document count if applicable.
+*   - Requires the `generateLog` function to generate log entries which depend on user profile and configuration settings.
+*   - Ensures that information related to each delete operation is audited and possibly persisted based on audit configuration options.
+*/
 const handleDeletingSchema = (schema: Schema) => {
     const log = generateLog();
     schema.post("findOneAndDelete", function () {
