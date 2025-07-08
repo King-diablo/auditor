@@ -2,11 +2,13 @@ import chalk from "chalk";
 import { Schema } from "mongoose";
 import { auditModel, checkForMongodb } from "../database/mongodb";
 import { errorLogger, requestLogger } from "../middleware";
-import { TAuditOptions, TEvent, TFileConfig, } from "../types/type";
-import { createFile, getTimeStamp, logAuditEvent } from "../utils";
+import { Framework, SupportedLoggersRequest, TAuditOptions, TEvent, TFileConfig } from "../types/type";
+import { createFile, generateAuditContent, getFileLocation, getTimeStamp, handleLog, logAuditEvent } from "../utils";
+import { userProfile } from "../utils/user";
+import { AppConfig } from "./AppConfigs";
 
 
-export class Audit {
+export class Audit<F extends Framework = "express"> {
     private logFilePath: string = "";
     private defaultFileConfigs: TFileConfig[] = [
         {
@@ -29,43 +31,50 @@ export class Audit {
             folderName: "audits",
             fullPath: "",
         },
-    ]
+    ];
     private fileConfig: TFileConfig = {
         fileName: "audit.log",
         folderName: "audit",
         fullPath: "",
-    }
+    };
     private isInitialized: boolean = false;
 
-
-    private config: TAuditOptions = {
+    private auditOptions: TAuditOptions<F> = {
         dbType: "none",
         destinations: ["console"],
+        framework: "express" as F,
         logger: console,
         useTimeStamp: true,
         splitFiles: false,
-    }
+        captureSystemErrors: false,
+    };
+
+
 
     /**
-     * Creates an instance of the Auditor class.
+     * Creates an instance of the Auditor class with the provided options.
      *
      * @param options - Optional configuration object for the auditor.
      *   - `logger`: Custom logger to use; defaults to `console` if not provided.
-     *   - `dbType`: Type of database to use; defaults to `"mongoose"`.
+     *   - `dbType`: Type of database to use; defaults to `"none"`.
      *   - `destinations`: Array of destinations for audit logs; defaults to `["console"]`.
+     *   - `framework`: The framework being used (e.g., "express"); defaults to `"express"`.
      *   - `useTimeStamp`: Whether to include timestamps in logs; defaults to `true`.
-     *   - `splitFiles`: Whether to split log files; defaults to `false`.
+     *   - `splitFiles`: Whether to split logs into multiple files; defaults to `false`.
+     *   - `captureSystemErrors`: Whether to capture system errors; defaults to `false`.
      *
-     * Initializes the auditor configuration with provided options or sensible defaults.
+     * Initializes the `auditOptions` property by merging the provided options with sensible defaults.
      */
-    constructor(private options?: TAuditOptions) {
-        this.config = {
+    constructor(private options?: TAuditOptions<F>) {
+        this.auditOptions = {
             ...options,
             logger: options?.logger || console,
             dbType: options?.dbType || "none",
             destinations: options?.destinations || ["console"],
+            framework: options?.framework as F ?? "express" as F,
             useTimeStamp: options?.useTimeStamp ?? true,
             splitFiles: options?.splitFiles ?? false,
+            captureSystemErrors: options?.captureSystemErrors ?? false,
         };
     }
 
@@ -81,18 +90,29 @@ export class Audit {
      */
     Setup() {
         if (this.isInitialized) {
-            this.config.logger?.warn(chalk.yellow("Audit already initialized."));
+            this.auditOptions.logger?.warn(chalk.yellow("Audit already initialized."));
             return;
         }
         this.CreateFileLocation(this.fileConfig);
-        this.isInitialized = true;
 
-        if (this.config.dbType === "mongoose") {
-            const result = checkForMongodb(this.config);
+        if (this.auditOptions.dbType === "mongoose") {
+            const result = checkForMongodb();
             if (!result) return;
         }
 
-        this.config.logger?.info(chalk.green("Default Audit config set successfully"));
+        AppConfig.setAuditOption(this.auditOptions);
+        AppConfig.setDefaultFileConfig(this.defaultFileConfigs);
+        AppConfig.setFileConfig(this.fileConfig);
+        AppConfig.setLogFilePath(this.logFilePath);
+        AppConfig.setCaptureSystemErrors(this.auditOptions.captureSystemErrors ?? false);
+        AppConfig.setFrameWork(this.auditOptions.framework!);
+
+        this.isInitialized = true;
+        AppConfig.setIsInitialized(this.isInitialized);
+
+        this.HandleSystemErrors();
+
+        this.auditOptions.logger?.info(chalk.green("Default Audit config set successfully"));
     }
 
     /**
@@ -109,24 +129,85 @@ export class Audit {
      * @param event - The event object to be logged.
      */
     Log(event: TEvent) {
-        const item = this.config.useTimeStamp ? { ...event, timeStamp: getTimeStamp() } : { ...event };
+        const item = this.auditOptions.useTimeStamp ? { ...event, timeStamp: getTimeStamp() } : { ...event };
 
-        if (this.config.destinations?.includes("console")) {
-            logAuditEvent(this.config, item);
-            this.config.logger?.info(item);
+        if (!this.isInitialized) {
+            this.auditOptions?.logger?.info(chalk.red("Not Initialized. Setup Is Required"));
         }
 
-        if (this.config.destinations?.includes("file")) {
+        if (this.auditOptions.destinations?.includes("console")) {
+            logAuditEvent(item);
+        }
 
-            if (!this.logFilePath) {
-                this.config.logger?.error(chalk.red("Unable to locate file path"));
+        if (this.auditOptions.destinations?.includes("file")) {
+
+            const actionFile = this.defaultFileConfigs.find(x => x.fileName === "action.log") as TFileConfig;
+            const file = this.auditOptions.splitFiles ? actionFile : this.fileConfig;
+
+            if (!file.fullPath) {
+                this.auditOptions.logger?.error(chalk.red("Unable to locate file path"));
                 return;
             }
 
-            const actionFile = this.defaultFileConfigs.find(x => x.fileName === "action.log") as TFileConfig;
-            const file = this.config.splitFiles ? actionFile : this.fileConfig;
+            logAuditEvent(item, file);
+        }
 
-            logAuditEvent(this.config, item, file);
+    }
+
+    /**
+        * Logs an error event to the configured destinations (console and/or file).
+        * @example
+        * LogError(new Error("Unexpected failure"))
+        * Logs error details to the console and file depending on configuration.
+        * @param {any} error - The error object to be logged.
+        * @description
+        *   - Extracts the error stack trace to capture informative details.
+        *   - Compiles additional user context such as IP and user agent when available.
+        *   - Handles uninitialized state by printing a warning message.
+        *   - Utilizes timestamp inclusion and log destination logic based on audit options.
+        */
+    LogError(error: any) {
+
+        if (!this.isInitialized) {
+            this.auditOptions?.logger?.info(chalk.red("Not Initialized. Setup Is Required"));
+        }
+
+        let stackLine = "";
+        if (error.stack) {
+            const lines = error.stack.split('\n');
+            stackLine = lines.length > 1 ? lines[1].trim() : lines[0]?.trim() ?? "";
+        }
+
+        const generateErrorEvent = {
+            type: "error",
+            action: "unknown",
+            outcome: "error",
+            method: "user called",
+            statusCode: error.statusCode ?? 500,
+            userId: userProfile.getUserId() ?? "unknown",
+            ip: userProfile.getIp() ?? "unknown",
+            userAgent: userProfile.getUserAgent() ?? "unknown",
+            message: error.message ?? "an error occurred",
+            stack: stackLine ?? "no stack available",
+        };
+
+        const item = this.auditOptions.useTimeStamp ? { ...generateErrorEvent, timeStamp: getTimeStamp() } : { ...generateErrorEvent };
+
+        if (this.auditOptions.destinations?.includes("console")) {
+            logAuditEvent(item);
+        }
+
+        if (this.auditOptions.destinations?.includes("file")) {
+
+            const actionFile = this.defaultFileConfigs.find(x => x.fileName === "action.log") as TFileConfig;
+            const file = this.auditOptions.splitFiles ? actionFile : this.fileConfig;
+
+            if (!file.fullPath) {
+                this.auditOptions.logger?.error(chalk.red("Unable to locate file path"));
+                return;
+            }
+
+            logAuditEvent(item, file);
         }
 
     }
@@ -139,12 +220,7 @@ export class Audit {
      * @param schema - The schema object to be audited.
      */
     AuditModel<T>(schema: Schema<T>) {
-        if (this.config.splitFiles) {
-            const dbFile = this.defaultFileConfigs.find(x => x.fileName === "db.log") as TFileConfig;
-            auditModel(this.config, schema, dbFile);
-            return;
-        }
-        auditModel(this.config, schema, this.fileConfig);
+        auditModel(schema);
     }
 
     /**
@@ -159,15 +235,15 @@ export class Audit {
      *   - `folderName` (optional): The folder where the log file will be stored. Defaults to `"audit"`.
      *   - `fileName` (optional): The name of the log file. Defaults to `"audit.log"`.
      */
-    SetFileConfig(config?: Omit<TFileConfig, "fullPath">) {
+    SetFileConfig(config: Omit<TFileConfig, "fullPath">) {
 
-        if (!this.config.destinations?.includes("file")) {
-            this.config.logger?.warn(chalk.yellowBright("You need to add file to destinations for this to work properly"));
+        if (!this.auditOptions.destinations?.includes("file")) {
+            this.auditOptions.logger?.warn(chalk.yellowBright("You need to add file to destinations for this to work properly"));
             return;
         }
 
-        if (this.config.splitFiles) {
-            this.config.logger?.info(chalk.yellow("Cannot configure file as it is not supported when using splitfile"));
+        if (this.auditOptions.splitFiles) {
+            this.auditOptions.logger?.info(chalk.yellow("Cannot configure file as it is not supported when using splitfile"));
             return;
         }
 
@@ -179,10 +255,9 @@ export class Audit {
             ...config,
             folderName: folder,
             fileName,
-            fullPath: ""
+            fullPath: "",
         };
     }
-
 
     /**
      * Logs all incoming requests using the configured logger.
@@ -193,12 +268,8 @@ export class Audit {
      *
      * @returns The result of the `requestLogger` function, which handles the actual logging process.
      */
-    RequestLogger() {
-        if (this.config.splitFiles) {
-            const requestFile = this.defaultFileConfigs.find(x => x.fileName === "request.log") as TFileConfig;
-            return requestLogger(this.config, requestFile);
-        }
-        return requestLogger(this.config, this.fileConfig);
+    RequestLogger(): SupportedLoggersRequest[F] {
+        return requestLogger[this.auditOptions.framework!];
     }
 
     /**
@@ -211,18 +282,14 @@ export class Audit {
      * @returns The result of the error logger function, which handles error logging based on the current configuration.
      */
     ErrorLogger() {
-        if (this.config.splitFiles) {
-            const errorFile = this.defaultFileConfigs.find(x => x.fileName === "error.log") as TFileConfig;
-            return errorLogger(this.config, errorFile);
-        }
-        return errorLogger(this.config, this.fileConfig);
+        return errorLogger[this.auditOptions.framework!];
     }
 
 
     private CreateFileLocation = (config: TFileConfig) => {
-        if (!this.config.destinations?.includes("file")) return;
+        if (!this.auditOptions.destinations?.includes("file")) return;
 
-        if (this.config.splitFiles) {
+        if (this.auditOptions.splitFiles) {
             this.defaultFileConfigs.forEach(item => {
                 this.GenerateFile(item);
             });
@@ -242,5 +309,82 @@ export class Audit {
             }
             return item;
         });
+    };
+
+    /**
+        * Sets up system error handling and logging for audit purposes.
+        * @example
+        * handleSystemErrors()
+        * Initializes processes to log exceptions, rejections, signals, and exits.
+        * @description
+        *   - Listens for Node.js process events such as uncaught exceptions, unhandled rejections, SIGTERM, SIGINT, and exit.
+        *   - Utilizes the `generateAuditContent` utility to format the logs.
+        *   - Logs generated content using `handleLog` with the error file configuration.
+        *   - Only activates if `captureSystemErrors` is true within audit options.
+        */
+    private HandleSystemErrors = () => {
+        if (!this.auditOptions.captureSystemErrors) return;
+        const file = getFileLocation("error.log");
+        process.on("uncaughtException", (error, origin) => {
+            const content = generateAuditContent({
+                type: "error",
+                action: "unknown",
+                message: "an uncaughtException",
+                outcome: "uncaughtException",
+                error,
+                origin,
+            });
+            handleLog(file, content);
+            process.exit(0);
+        });
+        process.on("unhandledRejection", (reason) => {
+            const content = generateAuditContent({
+                type: "error",
+                action: "unknown",
+                message: "an unhandledRejection",
+                outcome: "unhandledRejection",
+                reason,
+            });
+            handleLog(file, content);
+            process.exit(0);
+        });
+
+        process.on("SIGTERM", () => {
+            const content = generateAuditContent({
+                type: "signal",
+                action: "terminated",
+                message: "was terminated",
+                outcome: "SIGTERM",
+                signal: "SIGTERM",
+            });
+            handleLog(file, content);
+            process.exit(0);
+        });
+
+        process.on("SIGINT", () => {
+            const content = generateAuditContent({
+                type: "signal",
+                action: "terminated",
+                message: "app was terminated",
+                outcome: "SIGINT",
+                signal: "SIGINT",
+            });
+            handleLog(file, content);
+            process.exit(0);
+        });
+
+
+        process.on("exit", (code) => {
+            const content = generateAuditContent({
+                type: "system",
+                action: "exit",
+                message: "app was exited",
+                outcome: "exit",
+                code,
+            });
+            handleLog(file, content);
+            process.exit(code);
+        });
+
     };
 }

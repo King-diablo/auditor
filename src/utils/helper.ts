@@ -1,8 +1,9 @@
+import chalk from 'chalk';
 import { Request } from 'express';
-import { TAuditOptions, TFileConfig, } from '../types';
 import fs from "fs";
 import path from "path";
-import chalk from 'chalk';
+import { AppConfig } from '../core/AppConfigs';
+import { AuditContentParams, TFileConfig } from '../types';
 
 export const getTimeStamp = () => new Date().toISOString();
 export const getUserId = (req: Request) => {
@@ -21,19 +22,22 @@ export const getUserId = (req: Request) => {
     }
 };
 
-export const handleLog = (config: TAuditOptions, fileConfig: TFileConfig, content: any) => {
+export const handleLog = (fileConfig: TFileConfig, content: any) => {
+    const config = AppConfig.getAuditOption()!;
 
     if (config.destinations?.includes("console"))
-        logAuditEvent(config, content);
+        logAuditEvent(content);
     if (config.destinations?.includes("file"))
-        logAuditEvent(config, content, fileConfig);
+        logAuditEvent(content, fileConfig);
 };
 
-export const saveToFile = (config: TAuditOptions, file: TFileConfig, content: any) => {
+export const saveToFile = (file: TFileConfig, content: any) => {
+    const config = AppConfig.getAuditOption()!;
+
     try {
         fs.appendFileSync(file.fullPath, JSON.stringify(content, null, 4) + '\n', { encoding: "utf-8" });
     } catch (error) {
-        config.logger?.error(chalk.red("Failed to save log to file"));
+        config?.logger?.error(chalk.red("Failed to save log to file"));
     }
 };
 
@@ -48,10 +52,38 @@ export const createFile = (config: TFileConfig) => {
     return dir;
 };
 
-export const logAuditEvent = (config: TAuditOptions, content: any, file?: TFileConfig) => {
+export const logAuditEvent = (content: any, file?: TFileConfig) => {
+    const config = AppConfig.getAuditOption()!;
     if (file) {
-        saveToFile(config, file, content);
+        saveToFile(file, content);
         return;
     }
-    config.logger?.info(content);
+    config?.logger?.info(content);
+};
+
+export const getFileLocation = (location: string) => {
+    const config = AppConfig.getAuditOption()!;
+    const defaultFileConfigs = AppConfig.getDefaultFileConfig()!;
+
+    if (config.splitFiles) {
+        const dbFile = defaultFileConfigs.find(x => x.fileName === location) as TFileConfig;
+        return dbFile;
+    }
+
+    return AppConfig.getFileConfig()!;
+};
+
+export const generateAuditContent = ({
+    type,
+    action,
+    message,
+    ...rest
+}: AuditContentParams) => {
+    return {
+        type,
+        action,
+        message,
+        ...rest,
+        ...(AppConfig.getAuditOption()?.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),
+    };
 };
