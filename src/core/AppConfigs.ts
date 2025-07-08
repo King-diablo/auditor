@@ -1,4 +1,4 @@
-import { TAuditOptions, TFileConfig } from "../types";
+import { Framework, TAuditOptions, TFileConfig } from "../types";
 
 /**
  * Singleton configuration manager for the application.
@@ -19,16 +19,17 @@ import { TAuditOptions, TFileConfig } from "../types";
  * const logPath = AppConfig.getLogFilePath();
  * ```
  */
-export const AppConfig = (() => {
-    let logFilePath = "";
+export const AppConfig = (<F extends Framework>() => {
+    let logFilePath: string = '';
     let fileConfig: TFileConfig | undefined;
-    let auditOption: TAuditOptions | undefined;
+    let auditOption: TAuditOptions<F> | undefined;
     let isInitialized = false;
     let captureSystemErrors = true;
     let defaultFileConfigs: TFileConfig[] | undefined;
+    let framework: Framework;
 
     return {
-        setAuditOption(options: TAuditOptions) {
+        setAuditOption(options: TAuditOptions<F>) {
             auditOption = options;
         },
         getAuditOption() {
@@ -67,6 +68,12 @@ export const AppConfig = (() => {
         },
         getCaptureSystemErrors() {
             return captureSystemErrors;
-        }
+        },
+        setFrameWork(value: Framework) {
+            framework = value;
+        },
+        getFrameWork() {
+            return framework;
+        },
     };
 })();
