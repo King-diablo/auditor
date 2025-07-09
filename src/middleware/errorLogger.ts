@@ -21,7 +21,7 @@ const expressErrorLogger = (err: any, req: Request, res: Response, next: NextFun
         type: "error",
         action: "request failed",
         method: req.method,
-        statusCode: res.statusCode || 500,
+        statusCode: res.statusCode >= 400 ? res.statusCode : 500,
         route: req.originalUrl,
         statusMessage: res.statusMessage || "Internal Server Error",
         ip: req.ip ?? "unknown",
@@ -61,6 +61,7 @@ const fastifyErrorLogger = (error: FastifyError, request: ExtendedFastifyRequest
     };
 
     handleLog(file, content);
+    return reply.send(error);
 };
 
 const koaErrorLogger = async (ctx: Context, next: Next) => {
@@ -74,9 +75,9 @@ const koaErrorLogger = async (ctx: Context, next: Next) => {
 
         if (ctx.status >= 400) {
             let stackLine = "";
-            if (ctx.stack) {
-                const lines = ctx.stack?.split('\n');
-                stackLine = lines ? lines.length > 1 ? lines[1].trim() : lines[0]?.trim() ?? null : ctx.message;
+            if ((error as any).stack) {
+                const lines = (error as any).stack.split('\n');
+                stackLine = lines ? lines.length > 1 ? lines[1].trim() : lines[0]?.trim() ?? null : (error as any).message;
             }
 
             const content = {
@@ -87,7 +88,7 @@ const koaErrorLogger = async (ctx: Context, next: Next) => {
                 route: ctx.url,
                 ip: ctx.ip ?? "unknown",
                 userAgent: ctx.headers['user-agent'],
-                errorMessage: ctx.message,
+                errorMessage: (error as any).message,
                 stack: stackLine,
                 userId,
                 ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),

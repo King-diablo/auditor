@@ -69,6 +69,7 @@ export type TAuditOptions<F extends Framework> = {
     useTimeStamp?: boolean;
     splitFiles?: boolean;
     captureSystemErrors?: boolean;
+    useUI?: boolean;
 };
 
 export type TCustomEvent = {

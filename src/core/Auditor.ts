@@ -6,6 +6,7 @@ import { Framework, SupportedLoggersRequest, TAuditOptions, TEvent, TFileConfig 
 import { createFile, generateAuditContent, getFileLocation, getTimeStamp, handleLog, logAuditEvent } from "../utils";
 import { userProfile } from "../utils/user";
 import { AppConfig } from "./AppConfigs";
+import { checkForFramework, UIRouter } from "../router";
 
 
 export class Audit<F extends Framework = "express"> {
@@ -47,6 +48,7 @@ export class Audit<F extends Framework = "express"> {
         useTimeStamp: true,
         splitFiles: false,
         captureSystemErrors: false,
+        useUI: false,
     };
 
 
@@ -75,6 +77,7 @@ export class Audit<F extends Framework = "express"> {
             useTimeStamp: options?.useTimeStamp ?? true,
             splitFiles: options?.splitFiles ?? false,
             captureSystemErrors: options?.captureSystemErrors ?? false,
+            useUI: options?.useUI ?? false,
         };
     }
 
@@ -95,17 +98,23 @@ export class Audit<F extends Framework = "express"> {
         }
         this.CreateFileLocation(this.fileConfig);
 
+        AppConfig.setAuditOption(this.auditOptions);
+
         if (this.auditOptions.dbType === "mongoose") {
             const result = checkForMongodb();
             if (!result) return;
         }
 
-        AppConfig.setAuditOption(this.auditOptions);
+        if (this.auditOptions.useUI) {
+            checkForFramework();
+        }
+
         AppConfig.setDefaultFileConfig(this.defaultFileConfigs);
         AppConfig.setFileConfig(this.fileConfig);
         AppConfig.setLogFilePath(this.logFilePath);
         AppConfig.setCaptureSystemErrors(this.auditOptions.captureSystemErrors ?? false);
         AppConfig.setFrameWork(this.auditOptions.framework!);
+        AppConfig.setUseUI(this.auditOptions.useUI ?? false);
 
         this.isInitialized = true;
         AppConfig.setIsInitialized(this.isInitialized);
@@ -133,6 +142,7 @@ export class Audit<F extends Framework = "express"> {
 
         if (!this.isInitialized) {
             this.auditOptions?.logger?.info(chalk.red("Not Initialized. Setup Is Required"));
+            return;
         }
 
         if (this.auditOptions.destinations?.includes("console")) {
@@ -170,6 +180,7 @@ export class Audit<F extends Framework = "express"> {
 
         if (!this.isInitialized) {
             this.auditOptions?.logger?.info(chalk.red("Not Initialized. Setup Is Required"));
+            return;
         }
 
         let stackLine = "";
@@ -199,7 +210,7 @@ export class Audit<F extends Framework = "express"> {
 
         if (this.auditOptions.destinations?.includes("file")) {
 
-            const actionFile = this.defaultFileConfigs.find(x => x.fileName === "action.log") as TFileConfig;
+            const actionFile = this.defaultFileConfigs.find(x => x.fileName === "error.log") as TFileConfig;
             const file = this.auditOptions.splitFiles ? actionFile : this.fileConfig;
 
             if (!file.fullPath) {
@@ -286,6 +297,21 @@ export class Audit<F extends Framework = "express"> {
     }
 
 
+    /**
+        * Initializes UI routes based on the configured framework.
+        * @example
+        * CreateUI()
+        * Returns framework-specific UI Router.
+        * @returns {any} Framework-specific UI Router instance.
+        * @description
+        *   - This method utilizes the audit framework from the options to select the appropriate UI routing setup.
+        *   - Assumes framework options are correctly initialized and set.
+        */
+    CreateUI() {
+        return UIRouter[this.auditOptions.framework!];
+    }
+
+
     private CreateFileLocation = (config: TFileConfig) => {
         if (!this.auditOptions.destinations?.includes("file")) return;
 
@@ -335,7 +361,6 @@ export class Audit<F extends Framework = "express"> {
                 origin,
             });
             handleLog(file, content);
-            process.exit(0);
         });
         process.on("unhandledRejection", (reason) => {
             const content = generateAuditContent({
@@ -346,7 +371,6 @@ export class Audit<F extends Framework = "express"> {
                 reason,
             });
             handleLog(file, content);
-            process.exit(0);
         });
 
         process.on("SIGTERM", () => {
@@ -383,7 +407,6 @@ export class Audit<F extends Framework = "express"> {
                 code,
             });
             handleLog(file, content);
-            process.exit(code);
         });
 
     };
