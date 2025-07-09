@@ -25,8 +25,9 @@ export const AppConfig = (<F extends Framework>() => {
     let auditOption: TAuditOptions<F> | undefined;
     let isInitialized = false;
     let captureSystemErrors = true;
+    let useUI = false;
     let defaultFileConfigs: TFileConfig[] | undefined;
-    let framework: Framework;
+    let framework: Framework = "express";
 
     return {
         setAuditOption(options: TAuditOptions<F>) {
@@ -74,6 +75,12 @@ export const AppConfig = (<F extends Framework>() => {
         },
         getFrameWork() {
             return framework;
+        },
+        setUseUI(value: boolean) {
+            useUI = value;
+        },
+        getUseUI() {
+            return useUI;
         },
     };
 })();

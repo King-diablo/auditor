@@ -35,7 +35,8 @@ export const saveToFile = (file: TFileConfig, content: any) => {
     const config = AppConfig.getAuditOption()!;
 
     try {
-        fs.appendFileSync(file.fullPath, JSON.stringify(content, null, 4) + '\n', { encoding: "utf-8" });
+        fs.appendFileSync(file.fullPath, `${JSON.stringify(content)}\n`, { encoding: "utf-8" });
+
     } catch (error) {
         config?.logger?.error(chalk.red("Failed to save log to file"));
     }

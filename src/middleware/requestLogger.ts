@@ -58,6 +58,7 @@ const expressLogger = (req: Request, res: Response, next: NextFunction) => {
         const content = {
             type: "request",
             action: "incoming request",
+            outcome: "success",
             duration,
             method: req.method,
             statusCode: res.statusCode || 200,
@@ -142,23 +143,25 @@ const koaLogger = async (ctx: Context, next: Next) => {
     const userAgent = ctx.request.headers["user-agent"] || "";
     userProfile.BuildProfile(userId, route, ip, userAgent);
 
-    await next();
+    try {
+        await next();
+    } finally {
+        const duration = Date.now() - start;
 
-    const duration = Date.now() - start;
-
-    const content = {
-        type: "request",
-        action: "incoming request",
-        duration,
-        method: ctx.request.method,
-        statusCode: ctx.res.statusCode || 500,
-        ip,
-        route,
-        userAgent,
-        userId,
-        ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),
-    };
-    handleLog(file, content);
+        const content = {
+            type: "request",
+            action: "incoming request",
+            duration,
+            method: ctx.request.method,
+            statusCode: ctx.res.statusCode || 500,
+            ip,
+            route,
+            userAgent,
+            userId,
+            ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),
+        };
+        handleLog(file, content);
+    }
 };
 
 export const requestLogger: SupportedLoggersRequest = {
