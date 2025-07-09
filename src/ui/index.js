@@ -357,7 +357,7 @@ function updateColorControls() {
     const fetchedTypes = new Set(logData.map(l => l.type)).values();
     const filteredTypes = Array.from(fetchedTypes);
 
-    const types = filteredTypes ?? ['info', 'error', 'warning', 'success'];
+    const types = filteredTypes.length > 0 ? filteredTypes : ['info', 'error', 'warning', 'success'];
     types.forEach(type => {
         const controlDiv = document.createElement('div');
         controlDiv.className = 'color-control';
@@ -410,7 +410,7 @@ function exportChartAsPNG() {
 function filterLogsByTime() {
     const range = timeRangeSelect.value;
     const now = new Date();
-    let startDate, endDate = new Date();
+    let startDate = new Date(), endDate = new Date();
 
     switch (range) {
         case 'today':
@@ -559,20 +559,36 @@ function showLogDetails(log) {
 
     const details = [
         { label: 'ID', value: log.id },
-        { label: 'Type', value: `<span class="badge badge-${log.type}">${log.type}</span>` },
+        { label: 'Type', value: log.type },
         { label: 'Action', value: log.action },
         { label: 'Message', value: log.message },
         { label: 'Timestamp', value: formatDate(new Date(log.timeStamp), true) },
-        { label: `Meta`, value: `<pre>${JSON.stringify(log, null, 4)}</pre>` },
+        { label: 'Meta', value: JSON.stringify(log, null, 4) },
     ];
 
     details.forEach(detail => {
         const detailDiv = document.createElement('div');
         detailDiv.className = 'log-detail slide-up';
-        detailDiv.innerHTML = `
-            <label>${detail.label}:</label>
-            <span>${detail.value}</span>
-        `;
+
+        const labelEl = document.createElement('label');
+        labelEl.textContent = detail.label + ':';
+        detailDiv.appendChild(labelEl);
+
+        const wrapperSpan = document.createElement('span');
+        if (detail.label === 'Type') {
+            const badgeSpan = document.createElement('span');
+            badgeSpan.className = 'badge badge-' + detail.value;
+            badgeSpan.textContent = detail.value;
+            wrapperSpan.appendChild(badgeSpan);
+        } else if (detail.label === 'Meta') {
+            const preEl = document.createElement('pre');
+            preEl.textContent = detail.value;
+            wrapperSpan.appendChild(preEl);
+        } else {
+            wrapperSpan.textContent = detail.value;
+        }
+        detailDiv.appendChild(wrapperSpan);
+
         modalBody.appendChild(detailDiv);
     });
 

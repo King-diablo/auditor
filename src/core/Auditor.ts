@@ -98,6 +98,8 @@ export class Audit<F extends Framework = "express"> {
         }
         this.CreateFileLocation(this.fileConfig);
 
+        AppConfig.setAuditOption(this.auditOptions);
+
         if (this.auditOptions.dbType === "mongoose") {
             const result = checkForMongodb();
             if (!result) return;
@@ -107,7 +109,6 @@ export class Audit<F extends Framework = "express"> {
             checkForFramework();
         }
 
-        AppConfig.setAuditOption(this.auditOptions);
         AppConfig.setDefaultFileConfig(this.defaultFileConfigs);
         AppConfig.setFileConfig(this.fileConfig);
         AppConfig.setLogFilePath(this.logFilePath);
@@ -179,6 +180,7 @@ export class Audit<F extends Framework = "express"> {
 
         if (!this.isInitialized) {
             this.auditOptions?.logger?.info(chalk.red("Not Initialized. Setup Is Required"));
+            return;
         }
 
         let stackLine = "";

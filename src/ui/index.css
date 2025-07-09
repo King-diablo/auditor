@@ -309,13 +309,23 @@ body.sidebar-open .sidebar-overlay {
     display: flex;
     align-items: center;
     gap: 10px;
+    margin-bottom: 12px;
 }
 
 .color-preview {
-    width: 25px;
-    height: 25px;
+    width: 24px;
+    height: 24px;
     border-radius: 4px;
     border: 1px solid var(--border-color);
+    cursor: pointer;
+}
+
+input[type="color"] {
+    position: absolute;
+    opacity: 0;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
 }
 
 .color-control label {
@@ -513,8 +523,8 @@ tr:hover {
     color: white;
 }
 
-.badge-success {
-    background-color: var(--success-color);
+.badge-error {
+    background-color: var(--error-color);
     color: white;
 }
 
@@ -523,12 +533,23 @@ tr:hover {
     color: white;
 }
 
-.badge-error {
-    background-color: var(--error-color);
+.badge-success {
+    background-color: var(--success-color);
     color: white;
 }
+
 .badge-signal {
-    background-color: var(--error-color);
+    background-color: var(--error-color); /* Using error color for signals */
+    color: white;
+}
+
+.badge-system {
+    background-color: #607D8B; /* Blue Grey */
+    color: white;
+}
+
+.badge-request {
+    background-color: #FF5722; /* Deep Orange */
     color: white;
 }
 
