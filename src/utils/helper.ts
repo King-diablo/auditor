@@ -4,6 +4,8 @@ import fs from "fs";
 import path from "path";
 import { AppConfig } from '../core/AppConfigs';
 import { AuditContentParams, TFileConfig } from '../types';
+import crypto from "crypto";
+import { createRequire } from 'module';
 
 export const getTimeStamp = () => new Date().toISOString();
 export const getUserId = (req: Request) => {
@@ -59,7 +61,11 @@ export const logAuditEvent = (content: any, file?: TFileConfig) => {
         saveToFile(file, content);
         return;
     }
-    config?.logger?.info(content);
+
+    const cleanContent = { ...content };
+    delete cleanContent.fullStack;
+
+    config?.logger?.info(cleanContent);
 };
 
 export const getFileLocation = (location: string) => {
@@ -81,6 +87,7 @@ export const generateAuditContent = ({
     ...rest
 }: AuditContentParams) => {
     return {
+        id: generateId(),
         type,
         action,
         message,
@@ -88,3 +95,31 @@ export const generateAuditContent = ({
         ...(AppConfig.getAuditOption()?.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),
     };
 };
+
+export const generateId = () => {
+    const time = Date.now().toString(36);
+    const rand = crypto.randomBytes(3).toString('hex');
+    return `${time}-${rand}`;
+};
+
+export const checkForModule = (item: string) => {
+    const requireFromUserProject = createRequire(path.join(process.cwd(), 'index.js'));
+
+    try {
+        AppConfig.getAuditOption()?.logger?.info(
+            chalk.blueBright(`Checking for ${item}`),
+        );
+        requireFromUserProject.resolve(item);
+        AppConfig.getAuditOption()?.logger?.info(
+            chalk.greenBright(`${item} found.`),
+        );
+        return true;
+    } catch (error) {
+        AppConfig.getAuditOption()?.logger?.info(
+            chalk.redBright(`Failed to find "${item}"`),
+        );
+        return false;
+    }
+};
+
+

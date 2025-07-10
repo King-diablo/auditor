@@ -3,7 +3,7 @@ import { FastifyReply, HookHandlerDoneFunction } from "fastify";
 import { Context, Next } from "koa";
 import { AppConfig } from '../core/AppConfigs';
 import { SupportedLoggersRequest } from '../types';
-import { getFileLocation, getTimeStamp, getUserId, handleLog } from '../utils';
+import { generateAuditContent, getFileLocation, getUserId, handleLog } from '../utils';
 import { ExtendedFastifyRequest } from '../utils/interface';
 import { userProfile } from '../utils/user';
 
@@ -24,7 +24,6 @@ import { userProfile } from '../utils/user';
 *   - Configurable timestamp inclusion based on application settings.
 */
 const expressLogger = (req: Request, res: Response, next: NextFunction) => {
-    const config = AppConfig.getAuditOption()!;
     const file = getFileLocation("request.log");
     const start = Date.now();
     const route = req.originalUrl;
@@ -39,9 +38,10 @@ const expressLogger = (req: Request, res: Response, next: NextFunction) => {
         const duration = Date.now() - start;
 
         if ((res as any)._suppressAudit) {
-            const content = {
+            const content = generateAuditContent({
                 type: "request",
                 action: "incoming request",
+                message: `[${route}]||[${req.method}]||[${[res.statusCode]}]`,
                 outcome: "failure",
                 duration,
                 method: req.method,
@@ -50,25 +50,24 @@ const expressLogger = (req: Request, res: Response, next: NextFunction) => {
                 route,
                 userAgent,
                 userId: id,
-                ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),
-            };
+            });
             handleLog(file, content);
             return;
         }
-        const content = {
+        const content = generateAuditContent({
             type: "request",
             action: "incoming request",
             outcome: "success",
             duration,
             method: req.method,
             statusCode: res.statusCode || 200,
+            message: `[${route}]||[${req.method}]||[${[res.statusCode]}]`,
             route: route,
             statusMessage: res.statusMessage || "success",
             ip,
             userAgent,
             userId: id,
-            ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),
-        };
+        });
         handleLog(file, content);
     });
     next();
@@ -99,21 +98,21 @@ const fastifyLogger = {
         done();
     },
     onResponse: (request: ExtendedFastifyRequest, reply: FastifyReply, done: HookHandlerDoneFunction) => {
-        const config = AppConfig.getAuditOption()!;
         const file = getFileLocation("request.log");
         const duration = Date.now() - (request.startTime || Date.now());
-        const content = {
+        const route = userProfile.getEndPoint() ?? "unknown";
+        const content = generateAuditContent({
             type: "request",
             action: "incoming request",
             duration,
             method: request.method,
             statusCode: reply.statusCode || 500,
+            message: `[${route}]||[${request.method}]||[${[reply.statusCode]}]`,
             ip: userProfile.getIp() ?? "unknown",
-            route: userProfile.getEndPoint() ?? "unknown",
+            route,
             userAgent: userProfile.getUserAgent() ?? "unknown",
             userId: request.userId ?? "unknown",
-            ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),
-        };
+        });
         handleLog(file, content);
         done();
     },
@@ -148,18 +147,18 @@ const koaLogger = async (ctx: Context, next: Next) => {
     } finally {
         const duration = Date.now() - start;
 
-        const content = {
+        const content = generateAuditContent({
             type: "request",
             action: "incoming request",
             duration,
             method: ctx.request.method,
             statusCode: ctx.res.statusCode || 500,
+            message: `[${route}]||[${ctx.request.method}]||[${[ctx.status]}]`,
             ip,
             route,
             userAgent,
             userId,
-            ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),
-        };
+        });
         handleLog(file, content);
     }
 };
@@ -168,6 +167,4 @@ export const requestLogger: SupportedLoggersRequest = {
     express: expressLogger,
     fastify: fastifyLogger,
     koa: koaLogger,
-    // hapi: Function,
-    // restify: Function,
 };

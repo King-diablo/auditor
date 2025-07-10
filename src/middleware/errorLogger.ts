@@ -1,13 +1,11 @@
 import { NextFunction, Request, Response } from 'express';
 import { FastifyError, FastifyReply } from 'fastify';
 import { Context, Next } from 'koa';
-import { AppConfig } from '../core/AppConfigs';
-import { getFileLocation, getTimeStamp, getUserId, handleLog } from '../utils';
+import { generateAuditContent, getFileLocation, getUserId, handleLog } from '../utils';
 import { ExtendedFastifyRequest } from '../utils/interface';
 
 
 const expressErrorLogger = (err: any, req: Request, res: Response, next: NextFunction) => {
-    const config = AppConfig.getAuditOption()!;
     const file = getFileLocation("error.log");
 
     (res as any)._suppressAudit = true;
@@ -17,7 +15,7 @@ const expressErrorLogger = (err: any, req: Request, res: Response, next: NextFun
         const lines = err.stack.split('\n');
         stackLine = lines.length > 1 ? lines[1].trim() : lines[0]?.trim() ?? "";
     }
-    const content = {
+    const content = generateAuditContent({
         type: "error",
         action: "request failed",
         method: req.method,
@@ -26,11 +24,11 @@ const expressErrorLogger = (err: any, req: Request, res: Response, next: NextFun
         statusMessage: res.statusMessage || "Internal Server Error",
         ip: req.ip ?? "unknown",
         userAgent: req.headers['user-agent'],
-        errorMessage: err.message,
+        message: err.message,
         stack: stackLine,
+        fullStack: err.stack ?? "Invalid",
         userId: (typeof user === "string") ? user : user ? user?.id : "unknown",
-        ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),
-    };
+    });
 
     handleLog(file, content);
 
@@ -38,7 +36,6 @@ const expressErrorLogger = (err: any, req: Request, res: Response, next: NextFun
 };
 
 const fastifyErrorLogger = (error: FastifyError, request: ExtendedFastifyRequest, reply: FastifyReply) => {
-    const config = AppConfig.getAuditOption()!;
     const file = getFileLocation("error.log");
     let stackLine = "";
     if (error.stack) {
@@ -46,7 +43,7 @@ const fastifyErrorLogger = (error: FastifyError, request: ExtendedFastifyRequest
         stackLine = lines ? lines.length > 1 ? lines[1].trim() : lines[0]?.trim() ?? "" : error.message;
     }
 
-    const content = {
+    const content = generateAuditContent({
         type: "error",
         action: "request failed",
         method: request.method,
@@ -54,24 +51,23 @@ const fastifyErrorLogger = (error: FastifyError, request: ExtendedFastifyRequest
         route: request.url,
         ip: request.ip ?? "unknown",
         userAgent: request.headers['user-agent'],
-        errorMessage: error.message,
+        message: error.message,
         stack: stackLine,
+        fullStack: error.stack ?? "Invalid",
         userId: request.userId ?? "unknown",
-        ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),
-    };
+    });
 
     handleLog(file, content);
     return reply.send(error);
 };
 
 const koaErrorLogger = async (ctx: Context, next: Next) => {
-    const config = AppConfig.getAuditOption()!;
     const file = getFileLocation("error.log");
     const userId = ctx.state.userId ?? "unknown";
 
     try {
         await next();
-    } catch (error) {
+    } catch (error: any) {
 
         if (ctx.status >= 400) {
             let stackLine = "";
@@ -80,19 +76,19 @@ const koaErrorLogger = async (ctx: Context, next: Next) => {
                 stackLine = lines ? lines.length > 1 ? lines[1].trim() : lines[0]?.trim() ?? null : (error as any).message;
             }
 
-            const content = {
+            const content = generateAuditContent({
                 type: "error",
                 action: "request failed",
                 method: ctx.method,
                 statusCode: ctx.statusCode || 500,
+                message: (error as any).message,
                 route: ctx.url,
                 ip: ctx.ip ?? "unknown",
                 userAgent: ctx.headers['user-agent'],
-                errorMessage: (error as any).message,
                 stack: stackLine,
+                fullStack: error.stack ?? "Invalid",
                 userId,
-                ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),
-            };
+            });
 
             handleLog(file, content);
         }

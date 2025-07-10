@@ -145,20 +145,17 @@ function updateChart() {
 
     const types = [...new Set(filteredLogs.map(log => log.type))]; // ✅ Define this before use
 
-    const data = types.map(t => filteredLogs.filter(l => l.type === t).length);
-    const colors = types.map(getColor);
-
     const grouped = {};
 
     filteredLogs.forEach(log => {
         const date = new Date(log.timeStamp);
-        const hour = date.getHours().toString().padStart(2, '0') + ':00'; // "14:00"
+        const hour = `${date.getHours().toString().padStart(2, '0')}:00`; // "14:00"
         if (!grouped[hour]) grouped[hour] = {};
         if (!grouped[hour][log.type]) grouped[hour][log.type] = 0;
         grouped[hour][log.type]++;
     });
 
-    const allHours = Array.from({ length: 24 }, (_, h) => h.toString().padStart(2, '0') + ':00');
+    const allHours = Array.from({ length: 24 }, (_, h) => `${h.toString().padStart(2, '0')}:00`);
     const logTypes = [...new Set(filteredLogs.map(log => log.type))];
 
     // Prepare datasets
@@ -168,11 +165,11 @@ function updateChart() {
             data: allHours.map(hour => grouped[hour]?.[type] || 0),
             backgroundColor: getColor(type),
             borderColor: shadeColor(getColor(type), -20),
-            fill: chartType === 'line' ? false : true,
+            fill: chartType !== 'line',
             tension: 0.4,
             borderWidth: 2,
             pointBackgroundColor: getColor(type),
-            pointBorderColor: borderColor
+            pointBorderColor: borderColor,
         };
     });
 
@@ -308,9 +305,6 @@ function updateColorControls(types) {
 }
 
 
-
-
-
 function updateTable() {
     DOM.logTable.innerHTML = '';
     const start = (currentPage - 1) * logsPerPage;
@@ -375,8 +369,8 @@ function goToPage(p) {
 }
 
 function showDetails(e) {
-    const id = +e.currentTarget.dataset.id;
-    const log = logData.find(l => l.id === id);
+    const id = e.currentTarget.dataset.id;
+    const log = logData.find(l => l.id.toString() === id.toString());
 
     DOM.modalBody.innerHTML = `
       <div class="log-details-grid">
@@ -412,12 +406,12 @@ async function getAuditLogs() {
     try {
         const res = await fetch('/audit-log');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const logs = JSON.parse(await res.text()).trim().split('\n').filter(Boolean).map((line, i) => ({ id: i, ...JSON.parse(line) }));
-        return logs;
+        const data = await res.json();
+        return data;
     } catch {
         return [
             { id: 1, type: 'info', action: 'login', message: 'User logged in', timeStamp: new Date(), details: { userId: 1 } },
-            { id: 2, type: 'error', action: 'api_call', message: 'API failure', timeStamp: new Date(), details: { endpoint: '/api' } }
+            { id: 2, type: 'error', action: 'api_call', message: 'API failure', timeStamp: new Date(), details: { endpoint: '/api' } },
         ];
     }
 }

@@ -7,6 +7,7 @@ import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { fileURLToPath } from "url";
 import { AppConfig } from "../core/AppConfigs";
+import { checkForModule } from "../utils";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,7 +40,8 @@ const expressRouter = () => {
         const file = AppConfig.getFileConfig();
         if (!file) return;
         const logData = fs.readFileSync(file.fullPath, "utf-8");
-        res.status(200).json(logData);
+        const item = logData.trim().split('\n').filter(Boolean).map((line: any, i: number) => ({ id: i, ...JSON.parse(line) }));
+        res.status(200).json(item);
     });
 
     return router;
@@ -55,21 +57,8 @@ const koaRouter = () => {
 
 
 export const checkForFramework = () => {
-
     const activeFramework = AppConfig.getFrameWork() as string;
-    const requireFromUserProject = createRequire(path.join(process.cwd(), 'index.js'));
-
-    try {
-        console.log(`Checking for framework: ${activeFramework}`);
-        requireFromUserProject.resolve(activeFramework);  // resolved from user's project root
-        console.log(`Framework ${activeFramework} found.`);
-        return true;
-    } catch (error) {
-        AppConfig.getAuditOption()?.logger?.info(
-            chalk.redBright(`Failed to find framework "${activeFramework}". UI will not be available.`),
-        );
-        return false;
-    }
+    return checkForModule(activeFramework);
 };
 
 

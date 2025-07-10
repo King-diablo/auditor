@@ -1,35 +1,22 @@
 import chalk from "chalk";
 import { Schema } from "mongoose";
 import { AppConfig } from "../../core/AppConfigs";
-import { getFileLocation, getTimeStamp, logAuditEvent } from "../../utils";
+import { checkForModule, generateAuditContent, getFileLocation, getTimeStamp, logAuditEvent } from "../../utils";
 import { userProfile } from "../../utils/user";
 
 
 
 let hasMongoose = false;
 
+
 /**
- * Checks if the "mongoose" package is available in the current environment.
- * 
- * If "mongoose" is found, logs a success message and sets the `hasMongoose` flag to `true`.
- * If not found, logs an error message and sets the `hasMongoose` flag to `false`.
+ * Checks if the "mongoose" module is available in the current environment.
  *
- * @param config - The audit options object, which should include a logger for output messages.
- * @returns `true` if "mongoose" is available, otherwise `false`.
+ * @returns {boolean} Returns `true` if the "mongoose" module is found, otherwise `false`.
  */
 export const checkForMongodb = () => {
-    const config = AppConfig.getAuditOption()!;
-
-    try {
-        require.resolve("mongoose");
-        config.logger?.info(chalk.green("Mongoose auditing is available"));
-        hasMongoose = true;
-        return hasMongoose;
-    } catch (error) {
-        config.logger?.error(chalk.red("Mongoose must be installed to use MongoDB auditing."));
-        hasMongoose = false;
-        return hasMongoose;
-    }
+    hasMongoose = checkForModule("mongoose");
+    return hasMongoose;
 };
 
 /**
@@ -156,7 +143,7 @@ const generateLog = () => {
     const config = AppConfig.getAuditOption()!;
 
     return (action: TdbAction, modelName: string, filter: any, message: string, length?: number) => {
-        const content = {
+        const content = generateAuditContent({
             type: "db",
             action,
             collection: modelName,
@@ -168,7 +155,8 @@ const generateLog = () => {
             ip: userProfile.getIp(),
             userAgent: userProfile.getUserAgent(),
             ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),
-        };
+        });
+
         if (config.destinations?.includes("console"))
             logAuditEvent(content);
 

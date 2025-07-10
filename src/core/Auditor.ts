@@ -2,11 +2,11 @@ import chalk from "chalk";
 import { Schema } from "mongoose";
 import { auditModel, checkForMongodb } from "../database/mongodb";
 import { errorLogger, requestLogger } from "../middleware";
+import { UIRouter, checkForFramework, downloadDependency } from "../router";
 import { Framework, SupportedLoggersRequest, TAuditOptions, TEvent, TFileConfig } from "../types/type";
-import { createFile, generateAuditContent, getFileLocation, getTimeStamp, handleLog, logAuditEvent } from "../utils";
+import { createFile, generateAuditContent, getFileLocation, handleLog, logAuditEvent } from "../utils";
 import { userProfile } from "../utils/user";
 import { AppConfig } from "./AppConfigs";
-import { UIRouter, checkForFramework, downloadDependency } from "../router";
 
 
 export class Audit<F extends Framework = "express"> {
@@ -144,7 +144,8 @@ export class Audit<F extends Framework = "express"> {
      * @param event - The event object to be logged.
      */
     Log(event: TEvent) {
-        const item = this.auditOptions.useTimeStamp ? { ...event, timeStamp: getTimeStamp() } : { ...event };
+
+        const item = generateAuditContent({ ...event });
 
         if (!this.isInitialized) {
             this.auditOptions?.logger?.info(chalk.red("Not Initialized. Setup Is Required"));
@@ -195,7 +196,7 @@ export class Audit<F extends Framework = "express"> {
             stackLine = lines.length > 1 ? lines[1].trim() : lines[0]?.trim() ?? "";
         }
 
-        const generateErrorEvent = {
+        const item = generateAuditContent({
             type: "error",
             action: "unknown",
             outcome: "error",
@@ -206,9 +207,7 @@ export class Audit<F extends Framework = "express"> {
             userAgent: userProfile.getUserAgent() ?? "unknown",
             message: error.message ?? "an error occurred",
             stack: stackLine ?? "no stack available",
-        };
-
-        const item = this.auditOptions.useTimeStamp ? { ...generateErrorEvent, timeStamp: getTimeStamp() } : { ...generateErrorEvent };
+        });
 
         if (this.auditOptions.destinations?.includes("console")) {
             logAuditEvent(item);
