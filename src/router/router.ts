@@ -32,9 +32,11 @@ const expressRouter = () => {
 
             for (const item of files) {
                 const logData = fs.readFileSync(item.fullPath, "utf-8");
-                const latestData = logData.split('\n').filter(Boolean);
+                const latestData = logData.trim().split('\n').filter(Boolean).map((line: any, i: number) => ({ id: i, ...JSON.parse(line) }));
                 data.push(...latestData);
             }
+
+            res.status(200).json(data);
         }
 
         const file = AppConfig.getFileConfig();
