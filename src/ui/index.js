@@ -1,753 +1,588 @@
-async function fetchLogs() {
-    try {
-        const response = await fetch("/audit-log");
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const logsText = await response.text();
-        const cleaned = JSON.parse(logsText);
-        const logs = cleaned.trim().split('\n').filter(Boolean); // split into lines
+// Refactored and improved JavaScript for Audit Log Dashboard
 
-        const data = logs.map(line => JSON.parse(line)).map((item, index) => {
-            return {
-                id: index,
-                ...item,
-            };
-        });
-        return data;
-    } catch (error) {
-        console.error('Error fetching logs:', error);
-        return null; // Return null to indicate failure
-    }
-}
-
-async function getAuditLogs() {
-    try {
-        const logs = await fetchLogs();
-        if (logs && logs.length > 0) {
-            // console.log([new Set(logs.map(l => l.type))].map(i => i));
-            return logs;
-        }
-        console.log("Using temporary logs as fallback");
-        return [
-            { id: 1, type: 'info', action: 'login', message: 'User logged in successfully', timeStamp: new Date(Date.now() - 3600000), details: { userId: 123, ip: '192.168.1.1' } },
-            { id: 2, type: 'error', action: 'api_call', message: 'Failed to fetch user data', timeStamp: new Date(Date.now() - 7200000), details: { endpoint: '/api/users', status: 500 } },
-            // Add more sample data as needed...
-        ];
-    } catch (error) {
-        console.error('Error getting audit logs:', error);
-        return []; // Return empty array as final fallback
-    }
-}
-
-
-document.addEventListener('DOMContentLoaded', initDashboard);
-
-// DOM Elements
-const themeToggle = document.getElementById('themeToggle');
-const timeRangeSelect = document.getElementById('timeRange');
-const chartTypeSelect = document.getElementById('chartType');
-const exportChartBtn = document.getElementById('exportChart');
-const logTable = document.getElementById('logTable').querySelector('tbody');
-const searchLogs = document.getElementById('searchLogs');
-const prevPageBtn = document.getElementById('prevPage');
-const nextPageBtn = document.getElementById('nextPage');
-const pageNumbers = document.getElementById('pageNumbers');
-const paginationInfo = document.getElementById('paginationInfo');
-const menuToggle = document.getElementById('menuToggle');
-const sidebar = document.getElementById('sidebar');
-const closeSidebar = document.getElementById('closeSidebar');
-const colorControls = document.getElementById('colorControls');
-const resetColorsBtn = document.getElementById('resetColors');
-const modal = document.getElementById('logModal');
-const closeModal = document.querySelector('.close-modal');
-const modalBody = document.getElementById('modalBody');
-const entriesPerPage = document.getElementById('entriesPerPage');
-const logTypeFilter = document.getElementById('logTypeFilter');
-const startDateInput = document.getElementById('startDate');
-const endDateInput = document.getElementById('endDate');
-const applyCustomRangeBtn = document.getElementById('applyCustomRange');
-
-// Chart variables
-let logChart;
 const DEFAULT_COLORS = {
-    info: '#2196F3',      // Blue
-    error: '#F44336',     // Red
-    warning: '#FF9800',   // Orange
-    success: '#4CAF50',   // Green
-    signal: '#9C27B0',    // Purple
-    system: '#607D8B',    // Blue Grey
-    request: '#FF5722'    // Deep Orange
+    info: '#2196F3',
+    error: '#F44336',
+    warning: '#FF9800',
+    success: '#4CAF50',
+    signal: '#9C27B0',
+    system: '#607D8B',
+    request: '#FF5722',
 };
-let currentColors = { ...DEFAULT_COLORS };
 
-// Pagination variables
-let logsPerPage = parseInt(localStorage.getItem('logsPerPage')) || 10;
+let currentColors = { ...DEFAULT_COLORS };
+let logsPerPage = parseInt(localStorage.getItem('logsPerPage'), 10) || 10;
 let currentPage = 1;
 let filteredLogs = [];
 let logData = [];
+let logChart;
 
-// Initialize the dashboard
-async function initDashboard() {
-    const auditLogs = await getAuditLogs();
-    filteredLogs = [...auditLogs];
-    logData = auditLogs;
-    setupTheme();
-    setupEventListeners();
-    updateChart();
-    updateTable();
-    updatePagination();
-    populateLogTypeFilter();
+const DOM = {
+    themeToggle: document.getElementById('themeToggleCheckbox'),
+    timeRange: document.getElementById('timeRange'),
+    chartType: document.getElementById('chartType'),
+    exportChart: document.getElementById('exportChart'),
+    logTable: document.getElementById('logTable').querySelector('tbody'),
+    search: document.getElementById('searchLogs'),
+    prevPage: document.getElementById('prevPage'),
+    nextPage: document.getElementById('nextPage'),
+    pageNumbers: document.getElementById('pageNumbers'),
+    paginationInfo: document.getElementById('paginationInfo'),
+    closeSidebar: document.getElementById('closeSidebar'),
+    colorControls: document.getElementById('colorSettingsPanel'),
+    modal: document.getElementById('logModal'),
+    modalBody: document.getElementById('modalBody'),
+    closeModal: document.querySelector('.close-modal'),
+    entriesPerPage: document.getElementById('entriesPerPage'),
+    logTypeFilter: document.getElementById('logTypeFilter'),
+    startDate: document.getElementById('startDate'),
+    endDate: document.getElementById('endDate'),
+    applyCustomRange: document.getElementById('applyCustomRange'),
+    customRangeContainer: document.getElementById('customRangeContainer')
+};
 
-
-    // Initialize date inputs with reasonable defaults
-    const today = new Date();
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(today.getDate() - 7);
-    startDateInput.valueAsDate = oneWeekAgo;
-    endDateInput.valueAsDate = today;
-
-    // Set initial entries per page value
-    entriesPerPage.value = logsPerPage;
+function capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-// Set up theme from localStorage or preferred color scheme
-function setupTheme() {
-    const savedTheme = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-    if (savedTheme) {
-        document.documentElement.setAttribute('data-theme', savedTheme);
-    } else if (prefersDark) {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        localStorage.setItem('theme', 'dark');
-    }
+function generateColor() {
+    const h = Math.floor(Math.random() * 360);
+    return `hsl(${h}, 70%, 60%)`;
 }
 
-// Set up event listeners
-function setupEventListeners() {
-    themeToggle.addEventListener('click', toggleTheme);
-    timeRangeSelect.addEventListener('change', function () {
-        customRangeContainer.style.display = this.value === 'custom' ? 'flex' : 'none';
-        filterLogsByTime();
-    });
-    chartTypeSelect.addEventListener('change', updateChart);
-    exportChartBtn.addEventListener('click', exportChartAsPNG);
-    searchLogs.addEventListener('input', handleSearch);
-    prevPageBtn.addEventListener('click', goToPrevPage);
-    nextPageBtn.addEventListener('click', goToNextPage);
-    menuToggle.addEventListener('click', toggleSidebar);
-    closeSidebar.addEventListener('click', toggleSidebar);
-    resetColorsBtn.addEventListener('click', resetChartColors);
-    closeModal.addEventListener('click', () => modal.style.display = 'none');
-    window.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.style.display = 'none';
-        }
-    });
-    entriesPerPage.addEventListener('change', updateEntriesPerPage);
-    logTypeFilter.addEventListener('change', filterLogsByType);
-    applyCustomRangeBtn.addEventListener('click', applyCustomDateRange);
+function getColor(type) {
+    if (!currentColors[type]) currentColors[type] = generateColor();
+    return currentColors[type];
 }
 
-// Toggle between light and dark theme
-function toggleTheme() {
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-    updateChart(); // Update chart colors for better visibility
+function shadeColor(color, percent) {
+    const num = parseInt(color.slice(1), 16);
+    let R = (num >> 16) + percent;
+    let G = ((num >> 8) & 0x00FF) + percent;
+    let B = (num & 0x0000FF) + percent;
+    return `#${(1 << 24 | Math.min(255, R) << 16 | Math.min(255, G) << 8 | Math.min(255, B)).toString(16).slice(1)}`;
 }
 
-// Toggle sidebar visibility
-function toggleSidebar() {
-    sidebar.classList.toggle('open');
-    document.body.classList.toggle('sidebar-open');
-
-    if (sidebar.classList.contains('open')) {
-        const overlay = document.createElement('div');
-        overlay.className = 'sidebar-overlay';
-        overlay.addEventListener('click', toggleSidebar);
-        document.body.appendChild(overlay);
-    } else {
-        document.querySelector('.sidebar-overlay')?.remove();
-    }
-}
-
-function generateRandomColor() {
-    const hue = Math.floor(Math.random() * 360);
-    return `hsl(${hue}, 70%, 60%)`; // Using HSL for better color variety
-}
-
-// Function to get color for a type (with fallback)
-function getColorForType(type) {
-    // Return existing color if set
-    if (currentColors[type]) return currentColors[type];
-
-    // Return default color if exists
-    if (DEFAULT_COLORS[type]) {
-        currentColors[type] = DEFAULT_COLORS[type]; // Save to current colors
-        return DEFAULT_COLORS[type];
-    }
-
-    // Generate and store a new random color
-    const newColor = generateRandomColor();
-    currentColors[type] = newColor;
-    return newColor;
-}
-
-// Update the chart with current data and settings
-function updateChart() {
-    const ctx = document.getElementById('logChart').getContext('2d');
-    const chartType = chartTypeSelect.value;
-
-    // Get current theme colors
-    const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-color');
-    const borderColor = getComputedStyle(document.documentElement).getPropertyValue('--border-color');
-    const cardBg = getComputedStyle(document.documentElement).getPropertyValue('--card-bg');
-
-    // Group logs by type for chart data
-    const logTypes = [...new Set(logData.map(log => log.type))] ?? ['info', 'error', 'warning', 'success'];
-    const logCounts = {};
-
-    // Initialize counts
-    logTypes.forEach(type => {
-        logCounts[type] = 0;
-    });
-
-    // Count each log type in filtered logs
-    filteredLogs.forEach(log => {
-        if (Object.prototype.hasOwnProperty.call(logCounts, log.type)) {
-            logCounts[log.type]++;
-        }
-    });
-
-    // Prepare chart data with current colors
-    const labels = logTypes.map(type =>
-        `${type.charAt(0).toUpperCase() + type.slice(1)} (${logCounts[type]})`,
-    );
-
-    const data = logTypes.map(type => logCounts[type]);
-    const backgroundColors = logTypes.map(type => getColorForType(type));
-
-    // Animation configuration
-    const animationConfig = {
-        duration: 800,
-        easing: 'easeOutQuart',
-        animateScale: chartType === 'pie' || chartType === 'doughnut',
-        animateRotate: chartType === 'pie' || chartType === 'doughnut',
+function formatDate(date, full = false) {
+    const opt = full ? {
+        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+    } : {
+        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     };
-
-    // Destroy previous chart if exists
-    if (logChart) {
-        logChart.destroy();
-    }
-
-    // Create new chart with proper theming
-    logChart = new Chart(ctx, {
-        type: chartType,
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Log Count by Type',
-                data: data,
-                backgroundColor: backgroundColors,
-                borderColor: backgroundColors.map(color => shadeColor(color, -20)),
-                borderWidth: 1,
-                hoverBackgroundColor: backgroundColors.map(color => shadeColor(color, 10)),
-                hoverBorderColor: backgroundColors.map(color => shadeColor(color, -30)),
-                hoverBorderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: animationConfig,
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: {
-                        color: textColor,
-                        font: {
-                            size: 14,
-                            weight: '500'
-                        },
-                        padding: 20,
-                        usePointStyle: true,
-                        pointStyle: 'circle',
-                        generateLabels: function (chart) {
-                            return chart.data.labels.map((label, i) => ({
-                                text: label,
-                                fillStyle: chart.data.datasets[0].backgroundColor[i],
-                                strokeStyle: chart.data.datasets[0].borderColor[i],
-                                fontColor: textColor,
-                                lineWidth: 1,
-                                hidden: !chart.getDataVisibility(i),
-                                index: i
-                            }));
-                        }
-                    },
-                    onClick: function (evt, legendItem, legend) {
-                        const index = legendItem.index;
-                        legend.chart.toggleDataVisibility(index);
-                        legend.chart.update();
-                    }
-                },
-                tooltip: {
-                    backgroundColor: cardBg,
-                    titleColor: textColor,
-                    bodyColor: textColor,
-                    borderColor: borderColor,
-                    borderWidth: 1,
-                    displayColors: true,
-                    callbacks: {
-                        label: function (context) {
-                            const label = context.label || '';
-                            const value = context.raw || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = Math.round((value / total) * 100);
-                            return `${label}: ${value} (${percentage}%)`;
-                        }
-                    }
-                }
-            },
-            scales: chartType === 'bar' || chartType === 'line' ? {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        color: textColor,
-                        stepSize: 1,
-                        precision: 0
-                    },
-                    grid: {
-                        color: borderColor,
-                        borderDash: [5, 5]
-                    }
-                },
-                x: {
-                    ticks: {
-                        color: textColor
-                    },
-                    grid: {
-                        color: borderColor,
-                        borderDash: [5, 5]
-                    }
-                }
-            } : undefined,
-            elements: {
-                arc: {
-                    borderWidth: chartType === 'pie' || chartType === 'doughnut' ? 1 : 0
-                },
-                bar: {
-                    borderRadius: chartType === 'bar' ? 4 : 0
-                }
-            },
-            cutout: chartType === 'doughnut' ? '60%' : undefined
-        }
-    });
-
-    // Update color controls
-    updateColorControls();
+    return new Date(date).toLocaleDateString(undefined, opt);
 }
 
-// Update color controls in sidebar
-function updateColorControls() {
-    colorControls.innerHTML = '';
-
-    const fetchedTypes = new Set(logData.map(l => l.type)).values();
-    const filteredTypes = Array.from(fetchedTypes);
-
-    const types = filteredTypes.length > 0 ? filteredTypes : ['info', 'error', 'warning', 'success'];
-    types.forEach(type => {
-        const controlDiv = document.createElement('div');
-        controlDiv.className = 'color-control';
-
-        const label = document.createElement('label');
-        label.textContent = `${type.charAt(0).toUpperCase() + type.slice(1)}:`;
-        label.htmlFor = `color-${type}`;
-        label.style.color = getComputedStyle(document.documentElement).getPropertyValue('--text-color');
-
-        const colorPreview = document.createElement('div');
-        colorPreview.className = 'color-preview';
-        colorPreview.style.backgroundColor = currentColors[type];
-
-        const colorInput = document.createElement('input');
-        colorInput.type = 'color';
-        colorInput.id = `color-${type}`;
-        colorInput.value = currentColors[type];
-        colorInput.addEventListener('input', (e) => {
-            currentColors[type] = e.target.value;
-            colorPreview.style.backgroundColor = e.target.value;
-            updateChart();
-        });
-
-        controlDiv.appendChild(label);
-        controlDiv.appendChild(colorPreview);
-        controlDiv.appendChild(colorInput);
-        colorControls.appendChild(controlDiv);
-    });
-}
-
-// Reset chart colors to default
-function resetChartColors() {
-    currentColors = { ...DEFAULT_COLORS };
+function toggleTheme() {
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
     updateChart();
 }
 
-// Export chart as PNG
-function exportChartAsPNG() {
-    const chartCanvas = document.getElementById('logChart');
-
-    html2canvas(chartCanvas).then(canvas => {
-        const link = document.createElement('a');
-        link.download = 'log-chart.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-    });
+function initTheme() {
+    const saved = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', saved || (prefersDark ? 'dark' : 'light'));
+    if (!saved) localStorage.setItem('theme', prefersDark ? 'dark' : 'light');
 }
 
-// Filter logs by selected time range
-function filterLogsByTime() {
-    const range = timeRangeSelect.value;
+function applyDateFilter() {
     const now = new Date();
-    let startDate = new Date(), endDate = new Date();
+    const range = DOM.timeRange.value;
+    let start, end;
 
     switch (range) {
         case 'today':
-            startDate = new Date(now.setHours(0, 0, 0, 0));
+            start = new Date(now.setHours(0, 0, 0, 0));
+            end = new Date();
             break;
         case 'yesterday':
-            endDate = new Date(now.setHours(0, 0, 0, 0));
-            startDate = new Date(endDate);
-            startDate.setDate(startDate.getDate() - 1);
+            start = new Date(now.setDate(now.getDate() - 1));
+            start.setHours(0, 0, 0, 0);
+            end = new Date(now.setHours(23, 59, 59, 999));
             break;
         case 'week':
-            startDate = new Date(now.setDate(now.getDate() - 7));
+            start = new Date(now);
+            start.setDate(start.getDate() - start.getDay());
+            start.setHours(0, 0, 0, 0);
+            end = new Date();
             break;
         case 'month':
-            startDate = new Date(now.setMonth(now.getMonth() - 1));
+            start = new Date(now.getFullYear(), now.getMonth(), 1);
+            end = new Date();
             break;
         case 'custom':
-            return; // Handled separately
+            const s = new Date(DOM.startDate.value);
+            const e = new Date(DOM.endDate.value);
+            if (!isNaN(s) && !isNaN(e)) {
+                start = s;
+                end = new Date(e.setHours(23, 59, 59, 999));
+            } else return;
+            break;
         default:
             filteredLogs = [...logData];
-            updateTable();
-            updateChart();
-            updatePagination();
             return;
     }
-
-    filteredLogs = logData.filter(log => {
-        return log.timeStamp >= startDate && log.timeStamp <= endDate;
-    });
-
-    currentPage = 1;
-    updateTable();
+    filteredLogs = logData.filter(log => new Date(log.timeStamp) >= start && new Date(log.timeStamp) <= end);
     updateChart();
-    updatePagination();
-}
-
-// Apply custom date range filter
-function applyCustomDateRange() {
-    const startDate = new Date(startDateInput.value);
-    const endDate = new Date(endDateInput.value);
-
-    // Set end date to end of day
-    endDate.setHours(23, 59, 59, 999);
-
-    if (startDate > endDate) {
-        alert('Start date cannot be after end date');
-        return;
-    }
-
-    filteredLogs = logData.filter(log => {
-        return log.timeStamp >= startDate && log.timeStamp <= endDate;
-    });
-
-    currentPage = 1;
-    updateTable();
-    updateChart();
-    updatePagination();
-}
-
-// Filter logs by selected type
-function filterLogsByType() {
-    const selectedType = logTypeFilter.value;
-
-    if (selectedType === 'all') {
-        filteredLogs = [...logData];
-    } else {
-        filteredLogs = logData.filter(log => log.type === selectedType);
-    }
-
-    currentPage = 1;
-    updateTable();
-    updateChart();
-    updatePagination();
-}
-
-// Populate log type filter options
-function populateLogTypeFilter() {
-    // Get unique log types from data
-    const types = [...new Set(logData.map(log => log.type))];
-
-    // Clear existing options except "All Types"
-    logTypeFilter.innerHTML = '<option value="all">All Types</option>';
-
-    // Add new options
-    types.forEach(type => {
-        const option = document.createElement('option');
-        option.value = type;
-        option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
-        logTypeFilter.appendChild(option);
-    });
-}
-
-// Update entries per page
-function updateEntriesPerPage() {
-    logsPerPage = parseInt(entriesPerPage.value);
-    localStorage.setItem('logsPerPage', logsPerPage);
-    currentPage = 1;
     updateTable();
     updatePagination();
 }
 
-// Update the log table with paginated data
-function updateTable() {
-    logTable.innerHTML = '';
+function updateChart() {
+    const ctx = document.getElementById('logChart').getContext('2d');
+    const chartType = DOM.chartType.value;
 
-    const startIndex = (currentPage - 1) * logsPerPage;
-    const endIndex = startIndex + logsPerPage;
-    const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
+    // Get theme vars
+    const theme = getComputedStyle(document.documentElement);
+    const textColor = theme.getPropertyValue('--text-color').trim();
+    const borderColor = theme.getPropertyValue('--border-color').trim();
+    const cardBg = theme.getPropertyValue('--card-bg').trim();
 
-    if (paginatedLogs.length === 0) {
-        const row = document.createElement('tr');
-        row.innerHTML = '<td colspan="6" style="text-align: center;">No logs found</td>';
-        logTable.appendChild(row);
-        return;
-    }
+    // Clean chart if exists
+    if (logChart) logChart.destroy();
 
-    paginatedLogs.forEach(log => {
-        const row = document.createElement('tr');
-        row.className = 'fade-in';
+    const types = [...new Set(filteredLogs.map(log => log.type))]; // ✅ Define this before use
 
-        row.innerHTML = `
-            <td>${log.id}</td>
-            <td><span class="badge badge-${log.type}">${log.type}</span></td>
-            <td>${log.action}</td>
-            <td>${log?.message?.length > 50 ? `${log?.message.substring(0, 50)}...` : log.message}</td>
-            <td>${formatDate(new Date(log.timeStamp))}</td>
-            <td><button class="btn view-details" data-id="${log.id}"><i class="fas fa-eye"></i> View</button></td>
-        `;
+    const data = types.map(t => filteredLogs.filter(l => l.type === t).length);
+    const colors = types.map(getColor);
 
-        logTable.appendChild(row);
+    const grouped = {};
+
+    filteredLogs.forEach(log => {
+        const date = new Date(log.timeStamp);
+        const hour = date.getHours().toString().padStart(2, '0') + ':00'; // "14:00"
+        if (!grouped[hour]) grouped[hour] = {};
+        if (!grouped[hour][log.type]) grouped[hour][log.type] = 0;
+        grouped[hour][log.type]++;
     });
 
-    // Add event listeners to detail buttons
-    document.querySelectorAll('.view-details').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const logId = parseInt(this.getAttribute('data-id'));
-            const log = logData.find(l => l.id === logId);
-            showLogDetails(log);
-        });
+    const allHours = Array.from({ length: 24 }, (_, h) => h.toString().padStart(2, '0') + ':00');
+    const logTypes = [...new Set(filteredLogs.map(log => log.type))];
+
+    // Prepare datasets
+    const datasets = logTypes.map(type => {
+        return {
+            label: capitalize(type),
+            data: allHours.map(hour => grouped[hour]?.[type] || 0),
+            backgroundColor: getColor(type),
+            borderColor: shadeColor(getColor(type), -20),
+            fill: chartType === 'line' ? false : true,
+            tension: 0.4,
+            borderWidth: 2,
+            pointBackgroundColor: getColor(type),
+            pointBorderColor: borderColor
+        };
     });
-}
 
-// Show log details in modal
-function showLogDetails(log) {
-    modalBody.innerHTML = '';
-
-    const details = [
-        { label: 'ID', value: log.id },
-        { label: 'Type', value: log.type },
-        { label: 'Action', value: log.action },
-        { label: 'Message', value: log.message },
-        { label: 'Timestamp', value: formatDate(new Date(log.timeStamp), true) },
-        { label: 'Meta', value: JSON.stringify(log, null, 4) },
-    ];
-
-    details.forEach(detail => {
-        const detailDiv = document.createElement('div');
-        detailDiv.className = 'log-detail slide-up';
-
-        const labelEl = document.createElement('label');
-        labelEl.textContent = detail.label + ':';
-        detailDiv.appendChild(labelEl);
-
-        const wrapperSpan = document.createElement('span');
-        if (detail.label === 'Type') {
-            const badgeSpan = document.createElement('span');
-            badgeSpan.className = 'badge badge-' + detail.value;
-            badgeSpan.textContent = detail.value;
-            wrapperSpan.appendChild(badgeSpan);
-        } else if (detail.label === 'Meta') {
-            const preEl = document.createElement('pre');
-            preEl.textContent = detail.value;
-            wrapperSpan.appendChild(preEl);
-        } else {
-            wrapperSpan.textContent = detail.value;
+    const options = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                labels: {
+                    color: textColor,
+                    usePointStyle: true,
+                    boxWidth: 12,
+                    padding: 15
+                }
+            },
+            tooltip: {
+                backgroundColor: cardBg,
+                titleColor: textColor,
+                bodyColor: textColor,
+                borderColor: borderColor,
+                borderWidth: 1
+            }
+        },
+        scales: chartType === 'pie' || chartType === 'doughnut' ? {} : {
+            x: {
+                ticks: { color: textColor },
+                grid: { color: borderColor },
+                title: {
+                    display: true,
+                    text: 'Time',
+                    color: textColor
+                }
+            },
+            y: {
+                beginAtZero: true,
+                ticks: { color: textColor },
+                grid: { color: borderColor },
+                title: {
+                    display: true,
+                    text: 'Log Count',
+                    color: textColor
+                }
+            }
         }
-        detailDiv.appendChild(wrapperSpan);
-
-        modalBody.appendChild(detailDiv);
-    });
-
-    modal.style.display = 'block';
-
-}
-
-// Update pagination controls
-function updatePagination() {
-    const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
-
-    // Update pagination info
-    const startEntry = ((currentPage - 1) * logsPerPage) + 1;
-    const endEntry = Math.min(currentPage * logsPerPage, filteredLogs.length);
-    paginationInfo.textContent = `Showing ${startEntry} to ${endEntry} of ${filteredLogs.length} entries`;
-
-    // Update previous/next buttons
-    prevPageBtn.disabled = currentPage === 1;
-    nextPageBtn.disabled = currentPage === totalPages || totalPages === 0;
-
-    // Update page numbers
-    pageNumbers.innerHTML = '';
-
-    if (totalPages <= 1) return;
-
-    // Always show first page
-    addPageNumber(1);
-
-    // Show ellipsis if needed
-    if (currentPage > 3) {
-        const ellipsis = document.createElement('span');
-        ellipsis.textContent = '...';
-        pageNumbers.appendChild(ellipsis);
-    }
-
-    // Show current page and adjacent pages
-    const startPage = Math.max(2, currentPage - 1);
-    const endPage = Math.min(totalPages - 1, currentPage + 1);
-
-    for (let i = startPage; i <= endPage; i++) {
-        addPageNumber(i);
-    }
-
-    // Show ellipsis if needed
-    if (currentPage < totalPages - 2) {
-        const ellipsis = document.createElement('span');
-        ellipsis.textContent = '...';
-        pageNumbers.appendChild(ellipsis);
-    }
-
-    // Always show last page if different from first
-    if (totalPages > 1) {
-        addPageNumber(totalPages);
-    }
-}
-
-// Helper to add a page number button
-function addPageNumber(page) {
-    const pageBtn = document.createElement('span');
-    pageBtn.className = `page-number ${page === currentPage ? 'active' : ''}`;
-    pageBtn.textContent = page;
-    pageBtn.addEventListener('click', () => goToPage(page));
-    pageNumbers.appendChild(pageBtn);
-}
-
-// Navigate to specific page
-function goToPage(page) {
-    currentPage = page;
-    updateTable();
-    updatePagination();
-
-    // Smooth scroll to top of table
-    document.querySelector('.log-table-section').scrollIntoView({
-        behavior: 'smooth'
-    });
-}
-
-// Go to previous page
-function goToPrevPage() {
-    if (currentPage > 1) {
-        goToPage(currentPage - 1);
-    }
-}
-
-// Go to next page
-function goToNextPage() {
-    const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
-    if (currentPage < totalPages) {
-        goToPage(currentPage + 1);
-    }
-}
-
-// Handle search input
-function handleSearch() {
-    const searchTerm = searchLogs.value.toLowerCase();
-
-    if (searchTerm === '') {
-        filteredLogs = [...logData];
-    } else {
-        filteredLogs = logData.filter(log => {
-            return (
-                log.id.toString().includes(searchTerm) ||
-                log.type.toLowerCase().includes(searchTerm) ||
-                log.action.toLowerCase().includes(searchTerm) ||
-                log.message.toLowerCase().includes(searchTerm) ||
-                log.timeStamp.toISOString().toLowerCase().includes(searchTerm)
-            );
-        });
-    }
-
-    currentPage = 1;
-    updateTable();
-    updatePagination();
-}
-
-// Helper to format date
-function formatDate(date, full = false) {
-    const options = full ? {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-    } : {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
     };
 
-    return date?.toLocaleDateString(undefined, options);
-}
+    if (chartType === 'pie' || chartType === 'doughnut') {
+        const countByType = {};
+        filteredLogs.forEach(log => {
+            countByType[log.type] = (countByType[log.type] || 0) + 1;
+        });
 
-// Helper to shade a color
-function shadeColor(color, percent) {
-    let R = parseInt(color.substring(1, 3), 16);
-    let G = parseInt(color.substring(3, 5), 16);
-    let B = parseInt(color.substring(5, 7), 16);
+        const labels = Object.keys(countByType);
+        const data = Object.values(countByType);
+        const colors = labels.map(getColor);
 
-    R = parseInt(R * (100 + percent) / 100);
-    G = parseInt(G * (100 + percent) / 100);
-    B = parseInt(B * (100 + percent) / 100);
-
-    R = (R < 255) ? R : 255;
-    G = (G < 255) ? G : 255;
-    B = (B < 255) ? B : 255;
-
-    const RR = R.toString(16).padStart(2, '0');
-    const GG = G.toString(16).padStart(2, '0');
-    const BB = B.toString(16).padStart(2, '0');
-
-    return `#${RR}${GG}${BB}`;
-}
-
-// Make chart responsive to window resize
-window.addEventListener('resize', function () {
-    if (logChart) {
-        logChart.resize();
+        logChart = new Chart(ctx, {
+            type: chartType,
+            data: {
+                labels: labels.map(capitalize),
+                datasets: [{
+                    data,
+                    backgroundColor: colors,
+                    borderColor: colors.map(c => shadeColor(c, -20)),
+                    borderWidth: 1
+                }]
+            },
+            options
+        });
+    } else {
+        logChart = new Chart(ctx, {
+            type: chartType,
+            data: {
+                labels: allHours,
+                datasets
+            },
+            options
+        });
     }
-});
+}
+
+
+function getContrastYIQ(hexcolor) {
+    hexcolor = hexcolor.replace('#', '');
+    const r = parseInt(hexcolor.substr(0, 2), 16);
+    const g = parseInt(hexcolor.substr(2, 2), 16);
+    const b = parseInt(hexcolor.substr(4, 2), 16);
+    const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+    return yiq >= 128 ? '#000000' : '#ffffff';
+}
+
+
+function updateLogTableColors() {
+    document.querySelectorAll('#logTable .badge').forEach(badge => {
+        const type = badge.textContent.trim().toLowerCase();
+        const bgColor = currentColors[type] || getColor(type);
+        badge.style.backgroundColor = bgColor;
+        badge.style.color = getContrastYIQ(bgColor);
+    });
+}  
+
+
+function updateColorControls(types) {
+    DOM.colorControls.innerHTML = '';
+    types.forEach(type => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'color-control';
+        wrapper.innerHTML = `
+            <label for="color-${type}" style="color: var(--text-color); text-transform: capitalize;">
+                ${type}
+            </label>
+            <div class="color-preview" style="background:${getColor(type)}"></div>
+            <input type="color" id="color-${type}" value="${getColor(type)}">
+        `;
+        const colorInput = wrapper.querySelector('input');
+        colorInput.addEventListener('input', e => {
+            currentColors[type] = e.target.value;
+            updateChart();
+            updateTable(); // 👈 Updates the badge colors
+        });
+
+        wrapper.querySelector('input').addEventListener('change', e => {
+            e.stopPropagation(); // ✅ Prevents dropdown from closing or parent actions
+            currentColors[type] = e.target.value;
+            localStorage.setItem('customColors', JSON.stringify(currentColors));
+            updateChart();
+            updateLogTableColors();
+
+        });
+
+        DOM.colorControls.appendChild(wrapper);
+    });
+}
+
+
+
+
+
+function updateTable() {
+    DOM.logTable.innerHTML = '';
+    const start = (currentPage - 1) * logsPerPage;
+    const pageLogs = filteredLogs.slice(start, start + logsPerPage);
+    if (!pageLogs.length) {
+        DOM.logTable.innerHTML = '<tr><td colspan="6" style="text-align:center;">No logs found</td></tr>';
+        return;
+    }
+    pageLogs.forEach(log => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+        <td>${log.id}</td>
+        <td><span class="badge" style="background-color: ${getColor(log.type)}; color: #fff;">
+        ${log.type.charAt(0).toUpperCase() + log.type.slice(1)}</span></td>
+        <td>${capitalize(log.action)}</td>
+        <td>${log?.message?.slice(0, 50)}${log?.message?.length > 50 ? '...' : ''}</td>
+        <td>${formatDate(log.timeStamp)}</td>
+        <td><button class="btn view-details" data-id="${log.id}"><i class="fas fa-eye"></i> View</button></td>
+      `;
+        DOM.logTable.appendChild(row);
+    });
+    document.querySelectorAll('.view-details').forEach(btn => btn.addEventListener('click', showDetails));
+    updateLogTableColors();
+}
+
+function updatePagination() {
+    const total = Math.ceil(filteredLogs.length / logsPerPage);
+    const start = (currentPage - 1) * logsPerPage + 1;
+    const end = Math.min(currentPage * logsPerPage, filteredLogs.length);
+    DOM.paginationInfo.textContent = `Showing ${start}-${end} of ${filteredLogs.length}`;
+    DOM.prevPage.disabled = currentPage === 1;
+    DOM.nextPage.disabled = currentPage === total;
+    DOM.pageNumbers.innerHTML = '';
+
+    const maxPages = 7;
+    let pages = [];
+    if (total <= maxPages) {
+        pages = Array.from({ length: total }, (_, i) => i + 1);
+    } else {
+        pages = [1];
+        if (currentPage > 3) pages.push('...');
+        const start = Math.max(2, currentPage - 1);
+        const end = Math.min(total - 1, currentPage + 1);
+        for (let i = start; i <= end; i++) pages.push(i);
+        if (currentPage < total - 2) pages.push('...');
+        pages.push(total);
+    }
+
+    pages.forEach(p => {
+        const span = document.createElement('span');
+        span.className = `page-number ${p === currentPage ? 'active' : ''}`;
+        span.textContent = p;
+        if (p !== '...') span.addEventListener('click', () => goToPage(p));
+        DOM.pageNumbers.appendChild(span);
+    });
+}
+
+function goToPage(p) {
+    currentPage = p;
+    updateTable();
+    updatePagination();
+}
+
+function showDetails(e) {
+    const id = +e.currentTarget.dataset.id;
+    const log = logData.find(l => l.id === id);
+
+    DOM.modalBody.innerHTML = `
+      <div class="log-details-grid">
+        ${Object.entries(log).map(([key, value]) => `
+          <div class="log-detail-item">
+            <div class="log-detail-key">${formatKey(key)}</div>
+            <div class="log-detail-value">${formatValue(value)}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    DOM.modal.style.display = 'block';
+}
+
+function formatKey(key) {
+    // Format camelCase or snake_case keys to Title Case
+    return key
+        .replace(/_/g, ' ')
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function formatValue(value) {
+    if (typeof value === 'object') {
+        return `<pre>${JSON.stringify(value, null, 2)}</pre>`;
+    }
+    return String(value);
+}
+
+
+async function getAuditLogs() {
+    try {
+        const res = await fetch('/audit-log');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const logs = JSON.parse(await res.text()).trim().split('\n').filter(Boolean).map((line, i) => ({ id: i, ...JSON.parse(line) }));
+        return logs;
+    } catch {
+        return [
+            { id: 1, type: 'info', action: 'login', message: 'User logged in', timeStamp: new Date(), details: { userId: 1 } },
+            { id: 2, type: 'error', action: 'api_call', message: 'API failure', timeStamp: new Date(), details: { endpoint: '/api' } }
+        ];
+    }
+}
+
+async function initDashboard() {
+    const stored = localStorage.getItem('customColors');
+
+    let savedColors = {};
+
+    try {
+        savedColors = stored ? JSON.parse(stored) : {};
+    } catch (e) {
+        console.warn('Failed to parse saved colors:', e);
+    }
+
+    currentColors = { ...DEFAULT_COLORS, ...savedColors };
+
+    initTheme();
+    logData = await getAuditLogs();
+    filteredLogs = [...logData];
+
+    const types = [...new Set(logData.map(l => l.type))];
+    populateTypeFilter();
+    updateColorControls(types);
+
+
+    DOM.logTypeFilter.innerHTML = `<option value="all">All Types</option>${types.map(t => `<option value="${t}">${capitalize(t)}</option>`).join('')}`;
+
+    const savedChartType = localStorage.getItem('chartType');
+    if (savedChartType && DOM.chartType.querySelector(`option[value="${savedChartType}"]`)) {
+        DOM.chartType.value = savedChartType;
+    }
+
+
+    updateChart();
+    updateTable();
+    updatePagination();
+
+
+    const toggleBtn = document.getElementById('toggleColorSettings');
+    const panel = document.getElementById('colorSettingsPanel');
+
+    toggleBtn.addEventListener('click', () => {
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    });
+
+
+    DOM.themeToggle.addEventListener('click', toggleTheme);
+    DOM.chartType.addEventListener('change', () => {
+        const type = DOM.chartType.value;
+        localStorage.setItem('chartType', type);
+        updateChart();
+    });
+
+    DOM.prevPage.addEventListener('click', () => goToPage(currentPage - 1));
+    DOM.nextPage.addEventListener('click', () => goToPage(currentPage + 1));
+
+    DOM.search.addEventListener('input', applyFilters);
+    DOM.logTypeFilter.addEventListener('change', applyFilters);
+    DOM.timeRange.addEventListener('change', () => {
+        const showCustom = DOM.timeRange.value === 'custom';
+        document.getElementById('customRangeContainer').style.display = showCustom ? 'flex' : 'none';
+        if (!showCustom) applyFilters();
+    });
+    DOM.applyCustomRange.addEventListener('click', applyFilters);
+
+
+
+    // DOM.logTypeFilter.addEventListener('change', applyFilters);
+    // DOM.search.addEventListener('input', handleSearch);
+    // DOM.timeRange.addEventListener('change', () => {
+    //     const show = DOM.timeRange.value === 'custom';
+    //     DOM.customRangeContainer.style.display = show ? 'flex' : 'none';
+    //     if (!show) applyDateFilter();
+    // });
+    // DOM.applyCustomRange.addEventListener('click', applyDateFilter);
+    DOM.entriesPerPage.value = logsPerPage;
+    DOM.entriesPerPage.addEventListener('change', () => {
+        logsPerPage = +DOM.entriesPerPage.value;
+        localStorage.setItem('logsPerPage', logsPerPage);
+        currentPage = 1;
+        updateTable();
+        updatePagination();
+    });
+    DOM.closeModal.addEventListener('click', () => DOM.modal.style.display = 'none');
+    window.addEventListener('click', e => { if (e.target === DOM.modal) DOM.modal.style.display = 'none'; });
+}
+
+function applyFilters() {
+    const selectedType = DOM.logTypeFilter.value;
+    const selectedRange = DOM.timeRange.value;
+    const searchTerm = DOM.search.value.toLowerCase();
+
+    let filtered = [...logData];
+
+    // Filter by type
+    if (selectedType !== 'all') {
+        filtered = filtered.filter(log => log.type === selectedType);
+    }
+
+    // Filter by time range
+    const now = new Date();
+    const today = new Date(now.setHours(0, 0, 0, 0));
+
+    filtered = filtered.filter(log => {
+        const time = new Date(log.timeStamp);
+        switch (selectedRange) {
+            case 'today':
+                return time >= today;
+            case 'yesterday':
+                const yest = new Date(today);
+                yest.setDate(today.getDate() - 1);
+                return time >= yest && time < today;
+            case 'week':
+                const weekStart = new Date(today);
+                weekStart.setDate(today.getDate() - today.getDay());
+                return time >= weekStart;
+            case 'month':
+                const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+                return time >= monthStart;
+            case 'custom':
+                const start = new Date(DOM.startDate.value);
+                const end = new Date(DOM.endDate.value);
+                return time >= start && time <= end;
+            default:
+                return true;
+        }
+    });
+
+    // Search filter
+    if (searchTerm) {
+        filtered = filtered.filter(log =>
+            Object.values(log).some(v => v?.toString().toLowerCase().includes(searchTerm))
+        );
+    }
+
+    filteredLogs = filtered;
+    currentPage = 1;
+    updateChart();
+    updateTable();
+    updatePagination();
+    updateColorControls([...new Set(filteredLogs.map(log => log.type))]);
+}
+
+
+function populateTypeFilter() {
+    const types = [...new Set(logData.map(log => log.type))];
+    DOM.logTypeFilter.innerHTML = `<option value="all">All Types</option>`;
+    types.forEach(type => {
+        const opt = document.createElement('option');
+        opt.value = type;
+        opt.textContent = capitalize(type);
+        DOM.logTypeFilter.appendChild(opt);
+    });
+}
+
+
+function handleSearch() {
+    const term = DOM.search.value.toLowerCase();
+    filteredLogs = logData.filter(log =>
+        Object.values(log).some(v => v?.toString().toLowerCase().includes(term))
+    );
+    currentPage = 1;
+    updateTable();
+    updatePagination();
+}
+
+document.addEventListener('DOMContentLoaded', initDashboard);

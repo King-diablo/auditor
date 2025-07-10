@@ -1,138 +1,126 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Log Analytics Dashboard</title>
-    <link rel="stylesheet" href="index.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auditor Dashboard</title>
+  <link rel="stylesheet" href="index.css" />
 </head>
 <body>
-    <div class="dashboard-container">
-        <header class="dashboard-header">
-            <div class="header-left">
-                <button id="menuToggle" class="menu-toggle">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <h1>Log Analytics Dashboard</h1>
-            </div>
-            <div class="header-controls">
-                <div class="theme-toggle">
-                    <button id="themeToggle">
-                        <i class="fas fa-moon"></i>
-                        <i class="fas fa-sun"></i>
-                    </button>
-                </div>
-                <div class="time-range">
-                    <select id="timeRange">
-                        <option value="today">Today</option>
-                        <option value="yesterday">Yesterday</option>
-                        <option value="week">This Week</option>
-                        <option value="month">This Month</option>
-                        <option value="custom">Custom Range</option>
-                    </select>
-                </div>
-                <div class="custom-range" id="customRangeContainer" style="display: none;">
-                    <input type="date" id="startDate">
-                    <span>to</span>
-                    <input type="date" id="endDate">
-                    <button id="applyCustomRange" class="btn">Apply</button>
-                </div>
-                <div class="log-type-filter">
-                    <select id="logTypeFilter">
-                        <option value="all">All Types</option>
-                    </select>
-                </div>
-                <div class="chart-type">
-                    <select id="chartType">
-                        <option value="bar">Bar Chart</option>
-                        <option value="line">Line Chart</option>
-                        <option value="pie">Pie Chart</option>
-                        <option value="doughnut">Doughnut Chart</option>
-                    </select>
-                </div>
-                <button id="exportChart" class="btn export-btn">Export Chart</button>
-            </div>
-        </header>
-
-        <main class="dashboard-content">
-            <section class="chart-section">
-                <div class="chart-container">
-                    <canvas id="logChart"></canvas>
-                </div>
-            </section>
-
-            <section class="log-table-section">
-                <div class="table-header">
-                    <h2>Log Entries</h2>
-                    <div class="table-controls">
-                        <div class="search-box">
-                            <input type="text" id="searchLogs" placeholder="Search logs...">
-                            <i class="fas fa-search"></i>
-                        </div>
-                        <div class="entries-per-page">
-                            <span>Show</span>
-                            <select id="entriesPerPage">
-                                <option value="10">10</option>
-                                <option value="20">20</option>
-                                <option value="50">50</option>
-                                <option value="100">100</option>
-                            </select>
-                            <span>entries</span>
-                        </div>
-                        <div class="pagination-info" id="paginationInfo"></div>
-                    </div>
-                </div>
-                <div class="table-container">
-                    <table id="logTable">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Type</th>
-                                <th>Action</th>
-                                <th>Message</th>
-                                <th>Timestamp</th>
-                                <th>Details</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-                <div class="pagination-controls">
-                    <button id="prevPage" class="btn pagination-btn" disabled>Previous</button>
-                    <div class="page-numbers" id="pageNumbers"></div>
-                    <button id="nextPage" class="btn pagination-btn">Next</button>
-                </div>
-            </section>
-        </main>
-    </div>
-    
-    <div id="sidebar" class="sidebar">
-        <div class="sidebar-header">
-            <h3>Chart Customization</h3>
-            <button id="closeSidebar" class="close-sidebar">
-                <i class="fas fa-times"></i>
-            </button>
+  <div class="dashboard-container">
+    <header class="dashboard-header">
+      <div class="header-left">
+        <h1>Auditor Dashboard</h1>
+      </div>
+      <div class="header-controls">
+        <div class="theme-toggle">
+            <input type="checkbox" id="themeToggleCheckbox">
+            <label for="themeToggleCheckbox" class="theme-toggle-label"></label>
+          </div>
+          
+          
+        <div class="time-range">
+          <select id="timeRange">
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+            <option value="custom">Custom Range</option>
+          </select>
         </div>
-        <div class="sidebar-content">
-            <div id="colorControls" class="color-controls"></div>
-            <button id="resetColors" class="btn">Reset Colors</button>
+        <div class="custom-range" id="customRangeContainer" style="display: none;">
+          <input type="date" id="startDate" />
+          <span>to</span>
+          <input type="date" id="endDate" />
+          <button id="applyCustomRange" class="btn">Apply</button>
         </div>
-    </div>
+        <div class="log-type-filter">
+          <select id="logTypeFilter">
+            <option value="all">All Types</option>
+          </select>
+        </div>
+        
+        <div class="chart-type">
+          <select id="chartType">
+            <option value="bar">Bar Chart</option>
+            <option value="line">Line Chart</option>
+            <option value="pie">Pie Chart</option>
+            <option value="doughnut">Doughnut Chart</option>
+          </select>
+        </div>
+        <div class="color-settings-dropdown">
+            <button id="toggleColorSettings" class="btn">🎨 Colors</button>
+            <div id="colorSettingsPanel" class="dropdown-panel" style="display: none;"></div>
+          </div>
+          
+        <button id="exportChart" class="btn export-btn">Export Chart</button>
+      </div>
+    </header>
 
-    <div id="logModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Log Details</h2>
-                <span class="close-modal">&times;</span>
+    <main class="dashboard-content">
+      <section class="chart-section">
+        <div class="chart-container">
+          <canvas id="logChart"></canvas>
+        </div>
+      </section>
+
+      <section class="log-table-section">
+        <div class="table-header">
+          <h2>Log Entries</h2>
+          <div class="table-controls">
+            <div class="search-box">
+              <input type="text" id="searchLogs" placeholder="Search logs..." />
+              <i class="fas fa-search"></i>
             </div>
-            <div class="modal-body" id="modalBody"></div>
+            <div class="entries-per-page">
+              <span>Show</span>
+              <select id="entriesPerPage">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+              <span>entries</span>
+            </div>
+            <div class="pagination-info" id="paginationInfo"></div>
+          </div>
         </div>
-    </div>
+        <div class="table-container">
+          <table id="logTable">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Type</th>
+                <th>Action</th>
+                <th>Message</th>
+                <th>Timestamp</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="pagination-controls">
+          <button id="prevPage" class="btn pagination-btn" disabled>Previous</button>
+          <div class="page-numbers" id="pageNumbers"></div>
+          <button id="nextPage" class="btn pagination-btn">Next</button>
+        </div>
+      </section>
+    </main>
+  </div>
 
-    <script src="index.js"></script>
+  <div id="logModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Log Details</h2>
+        <span class="close-modal">&times;</span>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <script src="index.js"></script>
+  <script src="chart.min.js"></script>
+  <script src="html2canvas.min.js"></script>
 </body>
 </html>

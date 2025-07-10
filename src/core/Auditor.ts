@@ -6,7 +6,7 @@ import { Framework, SupportedLoggersRequest, TAuditOptions, TEvent, TFileConfig 
 import { createFile, generateAuditContent, getFileLocation, getTimeStamp, handleLog, logAuditEvent } from "../utils";
 import { userProfile } from "../utils/user";
 import { AppConfig } from "./AppConfigs";
-import { checkForFramework, UIRouter } from "../router";
+import { UIRouter, checkForFramework, downloadDependency } from "../router";
 
 
 export class Audit<F extends Framework = "express"> {
@@ -91,14 +91,21 @@ export class Audit<F extends Framework = "express"> {
      * @remarks
      * Should be called before performing any audit operations to ensure the environment is properly configured.
      */
-    Setup() {
+    async Setup() {
         if (this.isInitialized) {
             this.auditOptions.logger?.warn(chalk.yellow("Audit already initialized."));
             return;
         }
+
         this.CreateFileLocation(this.fileConfig);
 
         AppConfig.setAuditOption(this.auditOptions);
+        AppConfig.setDefaultFileConfig(this.defaultFileConfigs);
+        AppConfig.setFileConfig(this.fileConfig);
+        AppConfig.setLogFilePath(this.logFilePath);
+        AppConfig.setCaptureSystemErrors(this.auditOptions.captureSystemErrors ?? false);
+        AppConfig.setFrameWork(this.auditOptions.framework!);
+        AppConfig.setUseUI(this.auditOptions.useUI ?? false);
 
         if (this.auditOptions.dbType === "mongoose") {
             const result = checkForMongodb();
@@ -106,15 +113,14 @@ export class Audit<F extends Framework = "express"> {
         }
 
         if (this.auditOptions.useUI) {
-            checkForFramework();
+            const hasFramework = checkForFramework();
+            if (hasFramework) {
+                AppConfig.getAuditOption()?.logger?.info(chalk.yellow("In order to use this module some dependency will be downloaded"));
+                await downloadDependency();
+            }
         }
 
-        AppConfig.setDefaultFileConfig(this.defaultFileConfigs);
-        AppConfig.setFileConfig(this.fileConfig);
-        AppConfig.setLogFilePath(this.logFilePath);
-        AppConfig.setCaptureSystemErrors(this.auditOptions.captureSystemErrors ?? false);
-        AppConfig.setFrameWork(this.auditOptions.framework!);
-        AppConfig.setUseUI(this.auditOptions.useUI ?? false);
+
 
         this.isInitialized = true;
         AppConfig.setIsInitialized(this.isInitialized);
@@ -296,19 +302,21 @@ export class Audit<F extends Framework = "express"> {
         return errorLogger[this.auditOptions.framework!];
     }
 
-
     /**
-        * Initializes UI routes based on the configured framework.
-        * @example
-        * CreateUI()
-        * Returns framework-specific UI Router.
-        * @returns {any} Framework-specific UI Router instance.
-        * @description
-        *   - This method utilizes the audit framework from the options to select the appropriate UI routing setup.
-        *   - Assumes framework options are correctly initialized and set.
-        */
+     * Asynchronously creates and returns the UI component or handler based on the specified framework
+     * in the audit options.
+     *
+     * @returns {Promise<any>} A promise that resolves to the UI component or handler corresponding to the selected framework.
+     */
     CreateUI() {
+
+        if (!AppConfig.getUseUI()) {
+            AppConfig.getAuditOption()?.logger?.info(chalk.yellow("Add the useUI option in the constructor to download the dependency"));
+            return UIRouter[this.auditOptions.framework!];
+        }
+
         return UIRouter[this.auditOptions.framework!];
+
     }
 
 
