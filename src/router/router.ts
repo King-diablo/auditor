@@ -1,7 +1,5 @@
 import chalk from "chalk";
-import express, { Router } from "express";
 import fs, { createWriteStream, existsSync } from 'fs';
-import { createRequire } from 'module';
 import path from "path";
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
@@ -9,12 +7,64 @@ import { fileURLToPath } from "url";
 import { AppConfig } from "../core/AppConfigs";
 import { checkForModule } from "../utils";
 
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uiPath = path.join(__dirname, "ui");
 
-const expressRouter = () => {
-    const router = Router();
+
+const getLogs = () => {
+    const hasSplitFiles = AppConfig.getAuditOption()?.splitFiles;
+    const file = AppConfig.getFileConfig();
+
+    if (hasSplitFiles) {
+        const files = AppConfig.getDefaultFileConfig();
+        if (!files) return [];
+
+        const data = files.flatMap((item) => {
+            const logData = fs.readFileSync(item.fullPath, "utf-8");
+            return logData.trim().split("\n").filter(Boolean).map((line, i) => ({
+                id: i,
+                ...JSON.parse(line),
+            }));
+        });
+
+        return data.sort((a, b) => b.timeStamp.localeCompare(a.timeStamp));
+    }
+
+    if (!file) return [];
+
+    const logData = fs.readFileSync(file.fullPath, "utf-8");
+    const item = logData.trim().split("\n").filter(Boolean).map((line, i) => ({
+        id: i,
+        ...JSON.parse(line),
+    }));
+
+    return item.sort((a, b) => b.timeStamp.localeCompare(a.timeStamp));
+};
+
+
+/**
+ * Asynchronously creates and configures an Express router for serving the audit UI and logs.
+ *
+ * - Dynamically imports the `express` module. If `express` is not installed, logs a message and returns a no-op middleware.
+ * - Serves static files from the `uiPath` directory.
+ * - Handles GET requests to `/audit-ui` by serving the main UI HTML file.
+ * - Handles GET requests to `/audit-log` by returning audit logs as JSON.
+ *
+ * @returns {Promise<import("express").Router | import("express").RequestHandler>} 
+ *   A Promise that resolves to an Express router instance, or a no-op middleware if `express` is not available.
+ */
+const expressRouter = async () => {
+    let express;
+    try {
+        express = await import("express");
+    } catch (error) {
+        AppConfig.getAuditOption()?.logger?.info(chalk.redBright("Please install express in order to use this module"));
+        return (req: any, res: any, next: any) => next();
+    }
+
+    const router = express.Router();
 
     router.use(express.static(uiPath));
 
@@ -23,38 +73,104 @@ const expressRouter = () => {
     });
 
     router.get('/audit-log', (_req, res) => {
-        const hasSplitFiles = AppConfig.getAuditOption()?.splitFiles;
-        const data = [];
-
-        if (hasSplitFiles) {
-            const files = AppConfig.getDefaultFileConfig();
-            if (!files) return;
-
-            for (const item of files) {
-                const logData = fs.readFileSync(item.fullPath, "utf-8");
-                const latestData = logData.trim().split('\n').filter(Boolean).map((line: any, i: number) => ({ id: i, ...JSON.parse(line) }));
-                data.push(...latestData);
-            }
-
-            res.status(200).json(data);
-        }
-
-        const file = AppConfig.getFileConfig();
-        if (!file) return;
-        const logData = fs.readFileSync(file.fullPath, "utf-8");
-        const item = logData.trim().split('\n').filter(Boolean).map((line: any, i: number) => ({ id: i, ...JSON.parse(line) }));
-        res.status(200).json(item);
+        const logs = getLogs();
+        res.status(200).json({ logs });
     });
 
     return router;
 };
 
-const fastifyRouter = () => {
+/**
+ * Asynchronously creates a Fastify plugin for serving static files and API endpoints.
+ *
+ * This function attempts to dynamically import the `@fastify/static` module. If the import fails,
+ * it returns a no-op async function. Otherwise, it returns an async function that registers the static
+ * file handler and sets up two routes:
+ * 
+ * - `/audit-ui`: Serves the `index.html` file as an HTML response.
+ * - `/audit-log`: Returns audit logs as a JSON object.
+ *
+ * @returns {Promise<(fastify: any, opts: any) => Promise<void>>} A promise that resolves to a Fastify plugin function.
+ */
+const fastifyRouter = async () => {
 
+    let fastifyStatic;
+    try {
+        fastifyStatic = await import('@fastify/static');
+    } catch {
+        return async () => { };
+    }
+
+    return async function (fastify: any, opts: any) {
+        await fastify.register(fastifyStatic.default, {
+            root: uiPath,
+            prefix: '/',
+        });
+
+        /**
+                * Sends an HTML file as the response for the '/audit-ui' route in Fastify.
+                * @example
+                * (_req, reply) => {
+                *   reply.type('text/html').sendFile('index.html');
+                * }
+                * @param {any} _ - The incoming request object (not used in this function).
+                * @param {any} reply - The Fastify reply object used to send responses.
+                * @description
+                *   - This function sets the response type to 'text/html'.
+                *   - It sends 'index.html' located in the static files directory specified in uiPath.
+                */
+        fastify.get('/audit-ui', (_: any, reply: any) => {
+            reply.type('text/html').sendFile('index.html');
+        });
+
+        fastify.get('/audit-log', (_: any, reply: any) => {
+            reply.send({ logs: getLogs() });
+        });
+    };
 };
 
-const koaRouter = () => {
+/**
+* Initializes a Koa router for serving audit-related endpoints
+* @example
+* koaRouter()
+* @returns {Function} Middleware function composed with Koa static server and router.
+* @description
+*   - Dynamically imports necessary Koa modules and registers routes.
+*   - Serves the audit UI from a static HTML file.
+*   - Returns the audit logs in JSON format.
+*   - Logs a message if required packages are not installed.
+*/
+const koaRouter = async () => {
+    let Router, serve, compose;
 
+    try {
+        Router = (await import('@koa/router')).default;
+        serve = (await import('koa-static')).default;
+        compose = (await import('koa-compose')).default;
+    } catch {
+        AppConfig.getAuditOption()?.logger?.info(
+            chalk.redBright("Please install koa, @koa/router, koa-static, and koa-compose to use the audit UI."),
+        );
+        return async (ctx: any, next: any) => await next();
+    }
+
+    const router = new Router();
+
+
+    router.get('/audit-ui', (ctx: any) => {
+        ctx.type = 'html';
+        ctx.body = fs.createReadStream(path.join(uiPath, 'index.html'));
+    });
+
+    router.get('/audit-log', (ctx: any) => {
+        ctx.body = { logs: getLogs() };
+    });
+
+    return compose([
+        serve(uiPath),
+        router.routes(),
+        router.allowedMethods(),
+    ]);
 };
 
 

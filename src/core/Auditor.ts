@@ -359,13 +359,15 @@ export class Audit<F extends Framework = "express"> {
         if (!this.auditOptions.captureSystemErrors) return;
         const file = getFileLocation("error.log");
         process.on("uncaughtException", (error, origin) => {
+            const fullStack = error instanceof Error ? error.stack : undefined;
             const content = generateAuditContent({
                 type: "error",
                 action: "unknown",
-                message: "an uncaughtException",
+                message: error.message ?? "an uncaughtException",
                 outcome: "uncaughtException",
                 error,
                 origin,
+                fullStack,
             });
             handleLog(file, content);
         });

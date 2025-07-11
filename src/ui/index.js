@@ -407,7 +407,7 @@ async function getAuditLogs() {
         const res = await fetch('/audit-log');
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        return data;
+        return data.logs;
     } catch {
         return [
             { id: 1, type: 'info', action: 'login', message: 'User logged in', timeStamp: new Date(), details: { userId: 1 } },

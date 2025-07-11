@@ -1,7 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { FastifyReply, HookHandlerDoneFunction } from "fastify";
 import { Context, Next } from "koa";
-import { AppConfig } from '../core/AppConfigs';
 import { SupportedLoggersRequest } from '../types';
 import { generateAuditContent, getFileLocation, getUserId, handleLog } from '../utils';
 import { ExtendedFastifyRequest } from '../utils/interface';
@@ -41,7 +40,7 @@ const expressLogger = (req: Request, res: Response, next: NextFunction) => {
             const content = generateAuditContent({
                 type: "request",
                 action: "incoming request",
-                message: `[${route}]||[${req.method}]||[${[res.statusCode]}]`,
+                message: req.statusMessage ?? res.statusMessage ?? `[${route}]||[${req.method}]||[${[res.statusCode]}]`,
                 outcome: "failure",
                 duration,
                 method: req.method,
@@ -61,7 +60,7 @@ const expressLogger = (req: Request, res: Response, next: NextFunction) => {
             duration,
             method: req.method,
             statusCode: res.statusCode || 200,
-            message: `[${route}]||[${req.method}]||[${[res.statusCode]}]`,
+            message: req.statusMessage ?? res.statusMessage ?? `[${route}]||[${req.method}]||[${[res.statusCode]}]`,
             route: route,
             statusMessage: res.statusMessage || "success",
             ip,
@@ -90,7 +89,7 @@ const fastifyLogger = {
         request.startTime = Date.now();
         const id = request.userId ?? "unknown";
         const route = request.url;
-        const ip = request.ip;
+        const { ip } = request;
         const userAgent = request.headers['user-agent'] || '';
 
         userProfile.BuildProfile(id, route, ip, userAgent);
@@ -133,7 +132,6 @@ const fastifyLogger = {
 *   - Utilizes helper methods like `getTimeStamp` and `handleLog`.
 */
 const koaLogger = async (ctx: Context, next: Next) => {
-    const config = AppConfig.getAuditOption()!;
     const file = getFileLocation("request.log");
     const start = Date.now();
     const userId = ctx.state.userId ?? "unknown";
@@ -153,7 +151,7 @@ const koaLogger = async (ctx: Context, next: Next) => {
             duration,
             method: ctx.request.method,
             statusCode: ctx.res.statusCode || 500,
-            message: `[${route}]||[${ctx.request.method}]||[${[ctx.status]}]`,
+            message: ctx.message ?? `[${route}]||[${ctx.request.method}]||[${[ctx.status]}]`,
             ip,
             route,
             userAgent,
