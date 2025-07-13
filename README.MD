@@ -367,7 +367,4 @@ MIT
 
 PRs and feature requests are welcome!
 
-git clone https://github.com/kingdiablo/auditor
-cd auditor
-npm install
-npm run dev
+See the [CONTRIBUTING.MD](./CONTRIBUTING.md) for more information about contributing to this project.
