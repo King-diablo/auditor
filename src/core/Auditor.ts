@@ -363,7 +363,7 @@ export class Audit<F extends Framework = "express"> {
             const content = generateAuditContent({
                 type: "error",
                 action: "unknown",
-                message: error.message ?? "an uncaughtException",
+                message: error.message ?? "an uncaughtException occurred",
                 outcome: "uncaughtException",
                 error,
                 origin,
@@ -375,7 +375,7 @@ export class Audit<F extends Framework = "express"> {
             const content = generateAuditContent({
                 type: "error",
                 action: "unknown",
-                message: "an unhandledRejection",
+                message: "an unhandledRejection occurred",
                 outcome: "unhandledRejection",
                 reason,
             });
@@ -386,8 +386,8 @@ export class Audit<F extends Framework = "express"> {
             const content = generateAuditContent({
                 type: "signal",
                 action: "terminated",
-                message: "was terminated",
-                outcome: "SIGTERM",
+                message: "SIGTERM signal was received",
+                outcome: "terminated with SIGTERM",
                 signal: "SIGTERM",
             });
             handleLog(file, content);
@@ -398,8 +398,8 @@ export class Audit<F extends Framework = "express"> {
             const content = generateAuditContent({
                 type: "signal",
                 action: "terminated",
-                message: "app was terminated",
-                outcome: "SIGINT",
+                message: "app was terminated with a SIGINT signal",
+                outcome: "terminated with SIGINT",
                 signal: "SIGINT",
             });
             handleLog(file, content);

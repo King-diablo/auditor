@@ -69,11 +69,13 @@ const expressRouter = async () => {
     router.use(express.static(uiPath));
 
     router.get('/audit-ui', (_req, res) => {
+        res.statusMessage = "Fetched audit UI";
         res.sendFile(path.join(uiPath, "index.html"));
     });
 
     router.get('/audit-log', (_req, res) => {
         const logs = getLogs();
+        res.statusMessage = "Fetched audit logs";
         res.status(200).json({ logs });
     });
 
