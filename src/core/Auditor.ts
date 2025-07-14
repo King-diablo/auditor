@@ -1,9 +1,9 @@
 import chalk from "chalk";
-import { Schema } from "mongoose";
 import { auditModel, checkForMongodb } from "../database/mongodb";
+import { auditPrisma, checkForPrisma } from "../database/prisma";
 import { errorLogger, requestLogger } from "../middleware";
 import { UIRouter, checkForFramework, downloadDependency } from "../router";
-import { Framework, SupportedLoggersRequest, TAuditOptions, TEvent, TFileConfig } from "../types/type";
+import { DBInstance, Framework, SupportedLoggersRequest, TAuditOptions, TEvent, TFileConfig } from "../types/type";
 import { createFile, generateAuditContent, getFileLocation, handleLog, logAuditEvent } from "../utils";
 import { userProfile } from "../utils/user";
 import { AppConfig } from "./AppConfigs";
@@ -110,6 +110,10 @@ export class Audit<F extends Framework = "express"> {
         if (this.auditOptions.dbType === "mongoose") {
             const result = checkForMongodb();
             if (!result) return;
+        }
+
+        if (this.auditOptions.dbType === "prisma") {
+            const result = checkForPrisma();
         }
 
         if (this.auditOptions.useUI) {
@@ -228,15 +232,28 @@ export class Audit<F extends Framework = "express"> {
 
     }
 
-    /**
-     * Audits a given schema model by invoking the `auditModel` function with the current configuration,
-     * a generated timestamp, and the provided schema.
-     *
-     * @template T - The type of the schema being audited.
-     * @param schema - The schema object to be audited.
-     */
-    AuditModel<T>(schema: Schema<T>) {
-        auditModel(schema);
+
+/**
+    * Audits a database model based on the provided schema.
+    * @example
+    * auditModel(mongooseSchema)
+    * Initializes database operation auditing on a Mongoose schema or Prisma client.
+    * @param {DBInstance} schema - The database instance or schema to audit.
+    * @returns {void} Does not return a value.
+    * @description
+    *   - Only functions if a schema and a valid database type are provided.
+    *   - Mongoose audit will only occur if dbType is specifically set to "mongoose".
+    *   - Prisma audit operates if dbType is set to "prisma" with a valid PrismaClient instance.
+    */
+    AuditModel(schema: DBInstance) {
+        if (!schema) {
+            this.auditOptions.logger?.error(chalk.red("No schema or client provided"));
+            return;
+        }
+        if (this.auditOptions.dbType === "mongoose")
+            auditModel(schema);
+        if (this.auditOptions.dbType === "prisma")
+            auditPrisma(schema);
     }
 
     /**
