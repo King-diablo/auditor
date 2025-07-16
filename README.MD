@@ -314,11 +314,11 @@ app.use(audit.ErrorLogger());
 -   [x] Core audit logger class
 -   [x] Request and error middleware for Express, Fastify, Koa
 -   [x] File-based JSON logging
--   [x] **Database audit** — log database operations for Mongoose (MongoDB)
+-   [x] **Database audit** — log database operations for Mongoose (MongoDB) and Prisma
 -   [x] Audit UI support for Express, Fastify, and Koa
--   [x] Prisma and Sequelize support (planned)
+-   [ ] Sequelize support (planned)
 -   [ ] Remote logging transport (planned)
--   [ ] More configuration options: log rotation, custom transports (planned)
+-   [ ] More configuration options: log rotation
 
 ---
 
