@@ -1,7 +1,9 @@
 import type { NextFunction, Request, Response } from 'express';
 
-import type { Context, Next as KoaNext } from 'koa';
+import { PrismaClient } from '@prisma/client';
 import type { FastifyReply, HookHandlerDoneFunction } from 'fastify';
+import type { Context, Next as KoaNext } from 'koa';
+import { Schema } from "mongoose";
 import { ExtendedFastifyRequest } from '../utils/interface';
 
 type TActionMap = {
@@ -64,7 +66,7 @@ type TKnownEvent = {
 export type TAuditOptions<F extends Framework> = {
     destinations?: TDestinations[];
     logger?: Logger;
-    dbType?: 'none' | 'mongoose';
+    dbType?: Database;
     framework?: F;  // "express" | "fastify" | "koa", // | "hapi" | "restify"
     useTimeStamp?: boolean;
     splitFiles?: boolean;
@@ -108,13 +110,10 @@ export type SupportedLoggersRequest = {
     // hapi: () => {},
     // restify: () => {},
 };
-export type SupportedLoggersError = {
-    express: ExpressLogger;
-    koa: KoaLogger;
-    fastify: FastifyLogger;
-    // hapi: () => {},
-    // restify: () => {},
-};
+
+
+export type Database = 'none' | 'mongoose' | 'prisma';
+export type DBInstance = Schema | PrismaClient;
 
 export type Framework = keyof SupportedLoggersRequest;
 

@@ -154,7 +154,6 @@ const generateLog = () => {
             endPoint: userProfile.getEndPoint(),
             ip: userProfile.getIp(),
             userAgent: userProfile.getUserAgent(),
-            ...(config.useTimeStamp ? { timeStamp: getTimeStamp() } : {}),
         });
 
         if (config.destinations?.includes("console"))

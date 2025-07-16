@@ -1,3 +1,8 @@
+Got it! Here's the **full updated README** in a format that includes code blocks with the **copy button** (like in GitHub or Markdown viewers). Just scroll and click the copy icon in the top-right of each code block:
+
+---
+
+````markdown
 # 🛡️ Auditor
 
 Auditor is a lightweight, type-safe, and framework-agnostic audit logger for Node.js. It provides:
@@ -5,7 +10,7 @@ Auditor is a lightweight, type-safe, and framework-agnostic audit logger for Nod
 -   Request and error logging middleware for **Express**, **Fastify**, and **Koa**
 -   Type-safe business event logging
 -   Current flexible log destinations (console, file) with remote coming soon
--   **Database audit logging for Mongoose (MongoDB)** with others planned
+-   **Database audit logging for Mongoose (MongoDB)** and **Prisma** with others planned
 
 ---
 
@@ -13,7 +18,7 @@ Auditor is a lightweight, type-safe, and framework-agnostic audit logger for Nod
 
 ```bash
 npm install @kingdiablo/auditor
-```
+````
 
 You can also install and use your preferred logger and optionally an ORM:
 
@@ -34,7 +39,7 @@ import { Auditor } from '@kingdiablo/auditor';
 import express from 'express';
 
 const audit = new Auditor({ framework: 'express' });
-await audit.Setup(); // <--- Required! Must be called after creating the Auditor instance
+await audit.Setup();
 const app = express();
 app.use(audit.RequestLogger());
 app.use(audit.ErrorLogger());
@@ -47,7 +52,7 @@ import { Auditor } from '@kingdiablo/auditor';
 import Fastify from 'fastify';
 
 const audit = new Auditor({ framework: 'fastify' });
-await audit.Setup(); // <--- Required! Must be called after creating the Auditor instance
+await audit.Setup();
 const fastify = Fastify();
 fastify.addHook('onRequest', audit.RequestLogger().onRequest);
 fastify.addHook('onResponse', audit.RequestLogger().onResponse);
@@ -61,7 +66,7 @@ import { Auditor } from '@kingdiablo/auditor';
 import Koa from 'koa';
 
 const audit = new Auditor({ framework: 'koa' });
-await audit.Setup(); // <--- Required! Must be called after creating the Auditor instance
+await audit.Setup();
 const app = new Koa();
 app.use(audit.RequestLogger());
 // For error logging, use app.use(audit.ErrorLogger());
@@ -86,7 +91,6 @@ const app = express();
 app.use(audit.RequestLogger());
 app.use(audit.ErrorLogger());
 
-// Mount the audit UI routes
 if (audit.CreateUI) {
 	const auditUI = await audit.CreateUI();
 	app.use(auditUI);
@@ -107,7 +111,6 @@ fastify.addHook('onRequest', audit.RequestLogger().onRequest);
 fastify.addHook('onResponse', audit.RequestLogger().onResponse);
 fastify.setErrorHandler(audit.ErrorLogger());
 
-// Mount the audit UI routes
 const auditUI = await audit.CreateUI();
 fastify.register(auditUI);
 
@@ -129,7 +132,6 @@ const app = new Koa();
 app.use(audit.RequestLogger());
 app.use(audit.ErrorLogger());
 
-// Mount the audit UI routes
 const auditUI = await audit.CreateUI();
 app.use(auditUI);
 
@@ -144,120 +146,81 @@ The UI will be available at `/audit-ui` and audit logs can be fetched from `/aud
 
 ## 📄 Configuring File Logging (SetFileConfig)
 
-To customize the file logging location or filename, use the `SetFileConfig` method after creating your Auditor instance. This is useful if you want to store logs in a specific folder or use a custom log file name.
-
-**Requirements:**
-
--   The `file` destination must be enabled in your Auditor config.
--   `SetFileConfig` will not work if `splitFiles` is set to `true`.
-
 ```ts
-const audit = new Auditor({
-	destinations: ['file'],
-});
-audit.Setup(); // <--- Required! Must be called after creating the Auditor instance
+const audit = new Auditor({ destinations: ['file'] });
+await audit.Setup();
 
-// Configure file logging location and filename
-// This will store logs in './logs/my-audit.log'
 audit.SetFileConfig({
 	folderName: 'logs',
-	fileName: 'my-audit', // Do not include .log extension; it will be added automatically
+	fileName: 'my-audit',
 });
 ```
 
--   `folderName`: The folder where logs will be stored (default: `audit`)
--   `fileName`: The name of the log file (default: `audit`)
+Default values:
 
-If you do not call `SetFileConfig`, logs will be written to `./audit/audit.log` by default.
+* `folderName`: `audit`
+* `fileName`: `audit`
 
 ---
 
 ## 🛠️ Configuration
 
-You can create an Auditor instance with zero configuration for quick prototyping or testing:
-
-```ts
-const audit = new Auditor(); // Defaults to Express, console logging
-audit.Setup(); // <--- Required! Must be called after creating the Auditor instance
-```
-
-Or pass options to customize the logger, destinations, database type, timestamp usage, and split file logging:
-
 ```ts
 const audit = new Auditor({
-	logger: myLogger, // e.g., Winston or Pino instance
+	logger: myLogger,
 	destinations: ['console', 'file'],
 	dbType: 'mongoose',
-	useTimeStamp: true, // optional, default is true
-	splitFiles: true, // Logs to error.log, request.log, db.log, and action.log in the 'audits' folder
-	framework: 'fastify', // or 'koa', 'express'
-	useUI: true, // Enable the audit UI
+	useTimeStamp: true,
+	splitFiles: true,
+	framework: 'fastify',
+	useUI: true,
 });
-audit.Setup(); // <--- Required! Must be called after creating the Auditor instance
+await audit.Setup();
 ```
+
+---
 
 ## 🚀 Features
 
--   **Multi-framework support:** Express, Fastify, and Koa middleware out of the box
--   **Automatic MongoDB audit logging** (Mongoose): Track create, update, delete, and find operations on your models
--   **User context utilities:** Capture userId, endpoint, IP, and user agent for every log entry (see below for details)
--   **Split file logging:** Separate logs for errors, requests, DB actions, and business events
--   **Type-safe business event logging** with IntelliSense
--   **Pluggable logging backends** (Console, Winston, Pino, etc.)
--   **Configurable log destinations:** console, file
--   **System error & signal logging:** Optionally log uncaught exceptions, unhandled rejections, SIGTERM, SIGINT, and process exit events (see `captureSystemErrors`)
--   **Manual error logging:** Log errors directly using `audit.LogError(error)`
--   **Mongoose schema auditing:** Enable DB operation auditing for any Mongoose schema with `audit.AuditModel(schema)`
+* Multi-framework support
+* Request/error middleware
+* File-based JSON logging
+* Database audit logging (Mongoose + Prisma)
+* User context capture (userId, IP, endpoint)
+* Split file logging
+* Type-safe business event logging
+* Pluggable loggers (Console, Winston, Pino)
+* Optional system error signal logging
+* UI dashboard support
 
 ---
 
 ## ⚙ Configuration Options
 
-| Option                | Type     | Default       | Description                                                                             |
-| --------------------- | -------- | ------------- | --------------------------------------------------------------------------------------- |
-| `logger`              | any      | `console`     | Your custom logger instance (Winston, Pino, etc)                                        |
-| `destinations`        | string[] | `["console"]` | Where to send logs (`console`, `file`)                                                  |
-| `dbType`              | string   | `'none'`      | Supported DBs: `'mongoose'`                                                             |
-| `useTimeStamp`        | boolean  | `true`        | Include timestamp in logs                                                               |
-| `splitFiles`          | boolean  | `false`       | Log to separate files for errors, requests, db, actions                                 |
-| `framework`           | string   | `'express'`   | `'express'`, `'fastify'`, or `'koa'`                                                    |
-| `captureSystemErrors` | boolean  | `false`       | Log uncaught exceptions, unhandled rejections, SIGTERM, SIGINT, and process exit events |
-| `useUI`               | boolean  | `false`       | Enable the audit UI                                                                     |
-
----
-
-**Split file logging:**
-
--   When `splitFiles: true`, logs are written to `audits/error.log`, `audits/request.log`, `audits/db.log`, and `audits/action.log`.
--   Otherwise, all logs go to a single file (default: `audit/audit.log`).
-
-**System error logging:**
-
--   If `captureSystemErrors: true`, Auditor will log uncaught exceptions, unhandled promise rejections, SIGTERM, SIGINT, and process exit events to your error log.
-
-**Behavior if not initialized:**
-
--   If you forget to call `.Setup()`, log methods will warn you and may not function as expected.
+| Option                | Type      | Default       | Description                                      |
+| --------------------- | --------- | ------------- | ------------------------------------------------ |
+| `logger`              | any       | `console`     | Your custom logger instance (Winston, Pino, etc) |
+| `destinations`        | string\[] | `['console']` | Log destinations (`console`, `file`)             |
+| `dbType`              | string    | `'none'`      | `'mongoose'`, `'prisma'`                         |
+| `useTimeStamp`        | boolean   | `true`        | Add timestamp to logs                            |
+| `splitFiles`          | boolean   | `false`       | Use separate files for each log type             |
+| `framework`           | string    | `'express'`   | `'express'`, `'fastify'`, `'koa'`                |
+| `captureSystemErrors` | boolean   | `false`       | Capture uncaught exceptions, SIGTERM, etc        |
+| `useUI`               | boolean   | `false`       | Serve the audit dashboard                        |
 
 ---
 
 ## 🪵 Business Event Logging (`Log`)
 
-The `Log` method allows you to record business events, security actions, or any custom audit event in a type-safe way. It provides IntelliSense for event types and actions.
-
-**Example:**
-
 ```ts
 audit.Log({
-	type: 'auth', // IntelliSense: 'auth', 'billing', 'system', 'error', ...
-	action: 'login', // IntelliSense: 'login', 'logout', ...
+	type: 'auth',
+	action: 'login',
 	message: 'User logged in successfully.',
 });
 ```
 
-You can extend the available types and actions to fit your business needs, and TypeScript will provide suggestions and catch typos.
-
-**Custom event example:**
+Custom events are supported:
 
 ```ts
 audit.Log({
@@ -267,74 +230,86 @@ audit.Log({
 });
 ```
 
-## 🛑 Manual Error Logging (`LogError`)
+---
 
-You can manually log errors (outside of middleware) using the `LogError` method:
+## 🛑 Manual Error Logging (`LogError`)
 
 ```ts
 try {
-	// ...some code that might throw
+	// ...some code
 } catch (err) {
 	audit.LogError(err);
 }
 ```
 
-This will log the error to all configured destinations, including stack trace and user context if available.
-
 ---
 
 ## 🗄️ Mongoose Schema Auditing (`AuditModel`)
-
-To enable automatic auditing of database operations on a Mongoose schema, call `AuditModel` after defining your schema:
 
 ```ts
 import mongoose from 'mongoose';
 import { Auditor } from '@kingdiablo/auditor';
 
 const audit = new Auditor({ dbType: 'mongoose' });
-audit.Setup();
+await audit.Setup();
 
 const userSchema = new mongoose.Schema({
-	/* ... */
+	/* fields */
 });
-audit.AuditModel(userSchema); // <-- enables auditing for this schema
+
+audit.AuditModel(userSchema);
+```
+
+---
+
+## ✨ Prisma Database Auditing Support
+
+### Setup
+
+```bash
+npm install @prisma/client
+```
+
+```ts
+import { Auditor } from '@kingdiablo/auditor';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+const audit = new Auditor({ dbType: 'prisma' });
+await audit.Setup();
+audit.AuditModel(prisma);
+```
+
+---
+
+## 🔄 Request Logger Middleware (`RequestLogger`)
+
+```ts
+// Express
+app.use(audit.RequestLogger());
+
+// Fastify
+fastify.addHook('onRequest', audit.RequestLogger().onRequest);
+fastify.addHook('onResponse', audit.RequestLogger().onResponse);
+
+// Koa
+app.use(audit.RequestLogger());
 ```
 
 ---
 
 ## ⚠️ Error Logger Middleware (`ErrorLogger`)
 
-The `ErrorLogger` middleware automatically captures and logs errors that occur during request handling in your app.
-
-**Usage:**
-
 ```ts
 // Express
 app.use(audit.ErrorLogger());
-// Fastify: fastify.setErrorHandler(audit.ErrorLogger());
-// Koa: app.use(audit.ErrorLogger());
+
+// Fastify
+fastify.setErrorHandler(audit.ErrorLogger());
+
+// Koa
+app.use(audit.ErrorLogger());
 ```
-
-**How to include userId in error logs:**
-If your request object has a `user` property with an `id` field, it will be included in the log entry. Adjust your authentication middleware as needed.
-
----
-
-## 🔄 Request Logger Middleware (`RequestLogger`)
-
-The `RequestLogger` middleware tracks every incoming HTTP request and logs useful details for auditing and performance monitoring.
-
-**Usage:**
-
-```ts
-// Express
-app.use(audit.RequestLogger());
-// Fastify: fastify.addHook('onRequest', audit.RequestLogger().onRequest);
-//         fastify.addHook('onResponse', audit.RequestLogger().onResponse);
-// Koa: app.use(audit.RequestLogger());
-```
-
----
 
 ---
 
@@ -345,7 +320,7 @@ app.use(audit.RequestLogger());
 -   [x] File-based JSON logging
 -   [x] **Database audit** — log database operations for Mongoose (MongoDB)
 -   [x] Audit UI support for Express, Fastify, and Koa
--   [ ] Prisma and Sequelize support (planned)
+-   [x] Prisma and Sequelize support (planned)
 -   [ ] Remote logging transport (planned)
 -   [ ] More configuration options: log rotation, custom transports (planned)
 
@@ -353,7 +328,7 @@ app.use(audit.RequestLogger());
 
 ## 📋 Changelog
 
-See the [CHANGELOG.md](./CHANGELOG.md) for a detailed list of releases, new features, bug fixes, and planned improvements.
+See the [CHANGELOG.md](./CHANGELOG.md) for full release notes.
 
 ---
 
@@ -365,6 +340,5 @@ MIT
 
 ## 🙌 Contributing
 
-PRs and feature requests are welcome!
-
-See the [CONTRIBUTING.MD](./CONTRIBUTING.md) for more information about contributing to this project.
+Contributions welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for more info.
+```
