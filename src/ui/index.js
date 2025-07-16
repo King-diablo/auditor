@@ -42,7 +42,7 @@ const DOM = {
 };
 
 function capitalize(str) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
+    return str?.charAt(0).toUpperCase() + str?.slice(1);
 }
 
 
@@ -58,17 +58,17 @@ function getColor(type) {
 
 function shadeColor(color, percent) {
     const num = parseInt(color.slice(1), 16);
-    let R = (num >> 16) + percent;
-    let G = ((num >> 8) & 0x00FF) + percent;
-    let B = (num & 0x0000FF) + percent;
+    const R = (num >> 16) + percent;
+    const G = ((num >> 8) & 0x00FF) + percent;
+    const B = (num & 0x0000FF) + percent;
     return `#${(1 << 24 | Math.min(255, R) << 16 | Math.min(255, G) << 8 | Math.min(255, B)).toString(16).slice(1)}`;
 }
 
 function formatDate(date, full = false) {
     const opt = full ? {
-        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
     } : {
-        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+            year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
     };
     return new Date(date).toLocaleDateString(undefined, opt);
 }
@@ -544,7 +544,7 @@ function applyFilters() {
     // Search filter
     if (searchTerm) {
         filtered = filtered.filter(log =>
-            Object.values(log).some(v => v?.toString().toLowerCase().includes(searchTerm))
+            Object.values(log).some(v => v?.toString().toLowerCase().includes(searchTerm)),
         );
     }
 
