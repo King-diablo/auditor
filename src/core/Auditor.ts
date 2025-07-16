@@ -134,20 +134,23 @@ export class Audit<F extends Framework = "express"> {
         this.auditOptions.logger?.info(chalk.green("Default Audit config set successfully"));
     }
 
-    /**
-     * Logs an event to the configured destinations (console and/or file).
-     *
-     * Depending on the configuration, this method will:
-     * - Add a timestamp to the event if `useTimeStamp` is enabled.
-     * - Log the event to the console if "console" is included in `destinations`.
-     * - Log the event to a file if "file" is included in `destinations`.
-     *   - If `splitFiles` is enabled, logs to a specific action log file.
-     *   - Otherwise, logs to the default file configuration.
-     * - If the file path is not set when logging to a file, logs an error.
-     *
-     * @param event - The event object to be logged.
-     */
+
+/**
+    * Logs an event based on audit configuration to specified destinations such as console and/or file.
+    * @example
+    * Log({type: "info", action: "login", message: "User logged in"})
+    * Logs the provided event according to configured destinations and options.
+    * @param {TEvent} event - The event object to be logged, which includes the type, action, and message.
+    * @returns {void} Does not return a value.
+    * @description
+    *   - Checks for missing event details such as type, action, or message before logging.
+    *   - Utilizes `generateAuditContent` to structure the event data.
+    *   - Ensures logging operations do not proceed if the auditor is uninitialized.
+    *   - Handles file path validation when logging to files, especially in split file configurations.
+    */
     Log(event: TEvent) {
+
+        if (processEmptyLog(event)) return;
 
         const item = generateAuditContent({ ...event });
 
@@ -236,7 +239,7 @@ export class Audit<F extends Framework = "express"> {
 /**
     * Audits a database model based on the provided schema.
     * @example
-    * auditModel(mongooseSchema)
+    * auditModel(mongooseSchema) or auditModel(prismaClient)
     * Initializes database operation auditing on a Mongoose schema or Prisma client.
     * @param {DBInstance} schema - The database instance or schema to audit.
     * @returns {void} Does not return a value.
@@ -437,3 +440,17 @@ export class Audit<F extends Framework = "express"> {
 
     };
 }
+
+const processEmptyLog = (event: TEvent) => {
+    const missing = [];
+    if (!event?.type) missing.push("type");
+    if (!event?.action) missing.push("action");
+    if (!event?.message) missing.push("message");
+
+    if (missing.length) {
+        AppConfig.getAuditOption()?.logger?.error(chalk.redBright(`Unable to log message. Missing: ${missing.join(", ")}`));
+        return true;
+    }
+
+    return false;
+};

@@ -1,8 +1,4 @@
-Got it! Here's the **full updated README** in a format that includes code blocks with the **copy button** (like in GitHub or Markdown viewers). Just scroll and click the copy icon in the top-right of each code block:
 
----
-
-````markdown
 # 🛡️ Auditor
 
 Auditor is a lightweight, type-safe, and framework-agnostic audit logger for Node.js. It provides:
@@ -341,4 +337,3 @@ MIT
 ## 🙌 Contributing
 
 Contributions welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for more info.
-```
