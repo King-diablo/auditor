@@ -36,9 +36,8 @@ export const handleLog = (fileConfig: TFileConfig, content: any) => {
 export const saveToFile = (file: TFileConfig, content: any) => {
     const config = AppConfig.getAuditOption()!;
 
-    handleLogRotation(file);
-
     try {
+        handleLogRotation(file);
         fs.appendFileSync(file.fullPath, `${JSON.stringify(content)}\n`, { encoding: "utf-8" });
 
     } catch (error) {
@@ -105,9 +104,8 @@ export const generateId = () => {
 };
 
 export const checkForModule = (item: string) => {
-    const requireFromUserProject = createRequire(path.join(process.cwd(), 'index.js'));
-
     try {
+        const requireFromUserProject = createRequire(path.join(process.cwd(), 'index.js'));
         AppConfig.getAuditOption()?.logger?.info(
             chalk.blueBright(`Checking for ${item}`),
         );
@@ -147,7 +145,8 @@ const createLogArchive = (fileConfig: TFileConfig) => {
     if (!fs.existsSync(fullPath)) {
         fs.mkdirSync(fullPath, { recursive: true });
     }
-    const archiveName = `${fileConfig.fileName}_${getTimeStamp()}`;
+    const safeTimestamp = getTimeStamp().replace(/:/g, "-");
+    const archiveName = `${fileConfig.fileName}_${safeTimestamp}`;
     const dir = path.join(fullPath, archiveName);
 
     fs.copyFile(fileConfig.fullPath, dir, (err) => {
@@ -156,7 +155,6 @@ const createLogArchive = (fileConfig: TFileConfig) => {
         }
     });
 };
-
 const clearOriginalArchive = (fileConfig: TFileConfig) => {
     fs.writeFileSync(fileConfig.fullPath, "");
 };

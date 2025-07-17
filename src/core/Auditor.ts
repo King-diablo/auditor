@@ -104,43 +104,44 @@ export class Audit<F extends Framework = "express"> {
             return;
         }
 
-        this.CreateFileLocation(this.fileConfig);
+    this.CreateFileLocation(this.fileConfig);
 
-        AppConfig.setAuditOption(this.auditOptions);
-        AppConfig.setDefaultFileConfig(this.defaultFileConfigs);
-        AppConfig.setFileConfig(this.fileConfig);
-        AppConfig.setLogFilePath(this.logFilePath);
-        AppConfig.setCaptureSystemErrors(this.auditOptions.captureSystemErrors);
-        AppConfig.setFrameWork(this.auditOptions.framework!);
-        AppConfig.setUseUI(this.auditOptions.useUI);
-        AppConfig.setMaxRetention(this.auditOptions.maxRetention ?? 0);
+    AppConfig.setAuditOption(this.auditOptions);
+    AppConfig.setDefaultFileConfig(this.defaultFileConfigs);
+    AppConfig.setFileConfig(this.fileConfig);
+    AppConfig.setLogFilePath(this.logFilePath);
+    AppConfig.setCaptureSystemErrors(this.auditOptions.captureSystemErrors);
+    AppConfig.setFramework(this.auditOptions.framework!);
+    AppConfig.setUseUI(this.auditOptions.useUI);
+    AppConfig.setMaxRetention(this.auditOptions.maxRetention ?? 0);
 
-        if (this.auditOptions.dbType === "mongoose") {
-            const result = checkForMongodb();
-            if (!result) return;
-        }
-
-        if (this.auditOptions.dbType === "prisma") {
-            const result = checkForPrisma();
-        }
-
-        if (this.auditOptions.useUI) {
-            const hasFramework = checkForFramework();
-            if (hasFramework) {
-                AppConfig.getAuditOption()?.logger?.info(chalk.yellow("In order to use this module some dependency will be downloaded"));
-                await downloadDependency();
-            }
-        }
-
-
-
-        this.isInitialized = true;
-        AppConfig.setIsInitialized(this.isInitialized);
-
-        this.HandleSystemErrors();
-
-        this.auditOptions.logger?.info(chalk.green("Default Audit config set successfully"));
+    if (this.auditOptions.dbType === "mongoose") {
+        const result = checkForMongodb();
+        if (!result) return;
     }
+
+    if (this.auditOptions.dbType === "prisma") {
+        const result = checkForPrisma();
+        if (!result) return;
+    }
+
+    if (this.auditOptions.useUI) {
+        const hasFramework = checkForFramework();
+        if (hasFramework) {
+            AppConfig.getAuditOption()?.logger?.info(chalk.yellow("In order to use this module some dependency will be downloaded"));
+            await downloadDependency();
+        }
+    }
+
+
+
+    this.isInitialized = true;
+    AppConfig.setIsInitialized(this.isInitialized);
+
+    this.HandleSystemErrors();
+
+    this.auditOptions.logger?.info(chalk.green("Default Audit config set successfully"));
+}
 
 
 /**

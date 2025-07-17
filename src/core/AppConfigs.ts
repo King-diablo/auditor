@@ -71,10 +71,10 @@ export const AppConfig = (<F extends Framework>() => {
         getCaptureSystemErrors() {
             return captureSystemErrors;
         },
-        setFrameWork(value: Framework) {
+        setFramework(value: Framework) {
             framework = value;
         },
-        getFrameWork() {
+        getFramework() {
             return framework;
         },
         setUseUI(value: boolean | undefined) {
