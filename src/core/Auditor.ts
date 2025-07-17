@@ -4,7 +4,7 @@ import { auditPrisma, checkForPrisma } from "../database/prisma";
 import { errorLogger, requestLogger } from "../middleware";
 import { UIRouter, checkForFramework, downloadDependency } from "../router";
 import { DBInstance, Framework, SupportedLoggersRequest, TAuditOptions, TEvent, TFileConfig } from "../types/type";
-import { createFile, generateAuditContent, getFileLocation, handleLog, logAuditEvent } from "../utils";
+import { createFile, generateAuditContent, generateByte, getFileLocation, handleLog, logAuditEvent } from "../utils";
 import { userProfile } from "../utils/user";
 import { AppConfig } from "./AppConfigs";
 
@@ -15,27 +15,32 @@ export class Audit<F extends Framework = "express"> {
         {
             fileName: "error.log",
             folderName: "audits",
+            maxSizeBytes: generateByte(),
             fullPath: "",
         },
         {
             fileName: "request.log",
             folderName: "audits",
+            maxSizeBytes: generateByte(),
             fullPath: "",
         },
         {
             fileName: "db.log",
             folderName: "audits",
+            maxSizeBytes: generateByte(),
             fullPath: "",
         },
         {
             fileName: "action.log",
             folderName: "audits",
+            maxSizeBytes: generateByte(),
             fullPath: "",
         },
     ];
     private fileConfig: TFileConfig = {
         fileName: "audit.log",
         folderName: "audit",
+        maxSizeBytes: generateByte(),
         fullPath: "",
     };
     private isInitialized: boolean = false;
@@ -49,6 +54,7 @@ export class Audit<F extends Framework = "express"> {
         splitFiles: false,
         captureSystemErrors: false,
         useUI: false,
+        maxRetention: 0,
     };
 
 
@@ -78,6 +84,7 @@ export class Audit<F extends Framework = "express"> {
             splitFiles: options?.splitFiles ?? false,
             captureSystemErrors: options?.captureSystemErrors ?? false,
             useUI: options?.useUI ?? false,
+            maxRetention: options?.maxRetention ?? 0,
         };
     }
 
@@ -103,9 +110,10 @@ export class Audit<F extends Framework = "express"> {
         AppConfig.setDefaultFileConfig(this.defaultFileConfigs);
         AppConfig.setFileConfig(this.fileConfig);
         AppConfig.setLogFilePath(this.logFilePath);
-        AppConfig.setCaptureSystemErrors(this.auditOptions.captureSystemErrors ?? false);
+        AppConfig.setCaptureSystemErrors(this.auditOptions.captureSystemErrors);
         AppConfig.setFrameWork(this.auditOptions.framework!);
-        AppConfig.setUseUI(this.auditOptions.useUI ?? false);
+        AppConfig.setUseUI(this.auditOptions.useUI);
+        AppConfig.setMaxRetention(this.auditOptions.maxRetention ?? 0);
 
         if (this.auditOptions.dbType === "mongoose") {
             const result = checkForMongodb();

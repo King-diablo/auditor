@@ -36,6 +36,8 @@ export const handleLog = (fileConfig: TFileConfig, content: any) => {
 export const saveToFile = (file: TFileConfig, content: any) => {
     const config = AppConfig.getAuditOption()!;
 
+    handleLogRotation(file);
+
     try {
         fs.appendFileSync(file.fullPath, `${JSON.stringify(content)}\n`, { encoding: "utf-8" });
 
@@ -121,5 +123,69 @@ export const checkForModule = (item: string) => {
         return false;
     }
 };
+
+export const generateByte = (value: number = 5) => {
+    return value * 1024 * 1024;
+};
+
+const handleLogRotation = (fileConfig: TFileConfig) => {
+    if (!fileLimitExceeded(fileConfig)) return;
+
+    AppConfig.getAuditOption()?.logger?.warn(chalk.yellowBright(`${fileConfig.fileName} has reached or exceeded the size limit ${fileConfig.maxSizeBytes}`));
+    createLogArchive(fileConfig);
+    clearOriginalArchive(fileConfig);
+    deleteArchives(fileConfig);
+};
+
+const fileLimitExceeded = (fileConfig: TFileConfig) => {
+    return fs.statSync(fileConfig.fullPath).size >= fileConfig.maxSizeBytes;
+};
+
+
+const createLogArchive = (fileConfig: TFileConfig) => {
+    const fullPath = path.join(process.cwd(), `${fileConfig.folderName}/archive`);
+    if (!fs.existsSync(fullPath)) {
+        fs.mkdirSync(fullPath, { recursive: true });
+    }
+    const archiveName = `${fileConfig.fileName}_${getTimeStamp()}`;
+    const dir = path.join(fullPath, archiveName);
+
+    fs.copyFile(fileConfig.fullPath, dir, (err) => {
+        if (err) {
+            AppConfig.getAuditOption()?.logger?.error(chalk.redBright("failed to create audit copy"));
+        }
+    });
+};
+
+const clearOriginalArchive = (fileConfig: TFileConfig) => {
+    fs.writeFileSync(fileConfig.fullPath, "");
+};
+
+const deleteArchives = (fileConfig: TFileConfig) => {
+    const days = AppConfig.getAuditOption()?.maxRetention ?? 0;
+    if (days <= 0) return;
+
+    const currentDate = new Date();
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + days);
+
+    // check the archive files then the date thats has passed will be deleted
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

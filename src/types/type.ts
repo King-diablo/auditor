@@ -72,6 +72,7 @@ export type TAuditOptions<F extends Framework> = {
     splitFiles?: boolean;
     captureSystemErrors?: boolean;
     useUI?: boolean;
+    maxRetention?: number;
 };
 
 export type TCustomEvent = {
@@ -93,6 +94,7 @@ export type TFileConfig = {
     fileName: string,
     folderName: string;
     fullPath: string;
+    maxSizeBytes: number;
 };
 
 
