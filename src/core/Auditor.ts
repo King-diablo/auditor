@@ -4,7 +4,7 @@ import { auditPrisma, checkForPrisma } from "../database/prisma";
 import { errorLogger, requestLogger } from "../middleware";
 import { UIRouter, checkForFramework, downloadDependency } from "../router";
 import { DBInstance, Framework, SupportedLoggersRequest, TAuditOptions, TEvent, TFileConfig } from "../types/type";
-import { createFile, generateAuditContent, getFileLocation, handleLog, logAuditEvent } from "../utils";
+import { createFile, generateAuditContent, generateByte, getFileLocation, handleLog, logAuditEvent } from "../utils";
 import { userProfile } from "../utils/user";
 import { AppConfig } from "./AppConfigs";
 
@@ -15,27 +15,32 @@ export class Audit<F extends Framework = "express"> {
         {
             fileName: "error.log",
             folderName: "audits",
+            maxSizeBytes: generateByte(),
             fullPath: "",
         },
         {
             fileName: "request.log",
             folderName: "audits",
+            maxSizeBytes: generateByte(),
             fullPath: "",
         },
         {
             fileName: "db.log",
             folderName: "audits",
+            maxSizeBytes: generateByte(),
             fullPath: "",
         },
         {
             fileName: "action.log",
             folderName: "audits",
+            maxSizeBytes: generateByte(),
             fullPath: "",
         },
     ];
     private fileConfig: TFileConfig = {
         fileName: "audit.log",
         folderName: "audit",
+        maxSizeBytes: generateByte(),
         fullPath: "",
     };
     private isInitialized: boolean = false;
@@ -49,6 +54,7 @@ export class Audit<F extends Framework = "express"> {
         splitFiles: false,
         captureSystemErrors: false,
         useUI: false,
+        maxRetention: 0,
     };
 
 
@@ -78,6 +84,7 @@ export class Audit<F extends Framework = "express"> {
             splitFiles: options?.splitFiles ?? false,
             captureSystemErrors: options?.captureSystemErrors ?? false,
             useUI: options?.useUI ?? false,
+            maxRetention: options?.maxRetention ?? 0,
         };
     }
 
@@ -97,42 +104,44 @@ export class Audit<F extends Framework = "express"> {
             return;
         }
 
-        this.CreateFileLocation(this.fileConfig);
+        await this.CreateFileLocation(this.fileConfig);
 
-        AppConfig.setAuditOption(this.auditOptions);
-        AppConfig.setDefaultFileConfig(this.defaultFileConfigs);
-        AppConfig.setFileConfig(this.fileConfig);
-        AppConfig.setLogFilePath(this.logFilePath);
-        AppConfig.setCaptureSystemErrors(this.auditOptions.captureSystemErrors ?? false);
-        AppConfig.setFrameWork(this.auditOptions.framework!);
-        AppConfig.setUseUI(this.auditOptions.useUI ?? false);
+    AppConfig.setAuditOption(this.auditOptions);
+    AppConfig.setDefaultFileConfig(this.defaultFileConfigs);
+    AppConfig.setFileConfig(this.fileConfig);
+    AppConfig.setLogFilePath(this.logFilePath);
+    AppConfig.setCaptureSystemErrors(this.auditOptions.captureSystemErrors);
+    AppConfig.setFramework(this.auditOptions.framework!);
+    AppConfig.setUseUI(this.auditOptions.useUI);
+    AppConfig.setMaxRetention(this.auditOptions.maxRetention ?? 0);
 
-        if (this.auditOptions.dbType === "mongoose") {
-            const result = checkForMongodb();
-            if (!result) return;
-        }
-
-        if (this.auditOptions.dbType === "prisma") {
-            const result = checkForPrisma();
-        }
-
-        if (this.auditOptions.useUI) {
-            const hasFramework = checkForFramework();
-            if (hasFramework) {
-                AppConfig.getAuditOption()?.logger?.info(chalk.yellow("In order to use this module some dependency will be downloaded"));
-                await downloadDependency();
-            }
-        }
-
-
-
-        this.isInitialized = true;
-        AppConfig.setIsInitialized(this.isInitialized);
-
-        this.HandleSystemErrors();
-
-        this.auditOptions.logger?.info(chalk.green("Default Audit config set successfully"));
+    if (this.auditOptions.dbType === "mongoose") {
+        const result = checkForMongodb();
+        if (!result) return;
     }
+
+    if (this.auditOptions.dbType === "prisma") {
+        const result = checkForPrisma();
+        if (!result) return;
+    }
+
+    if (this.auditOptions.useUI) {
+        const hasFramework = checkForFramework();
+        if (hasFramework) {
+            AppConfig.getAuditOption()?.logger?.info(chalk.yellow("In order to use this module some dependency will be downloaded"));
+            await downloadDependency();
+        }
+    }
+
+
+
+    this.isInitialized = true;
+    AppConfig.setIsInitialized(this.isInitialized);
+
+    this.HandleSystemErrors();
+
+    this.auditOptions.logger?.info(chalk.green("Default Audit config set successfully"));
+}
 
 
 /**
@@ -339,21 +348,34 @@ export class Audit<F extends Framework = "express"> {
     }
 
 
-    private CreateFileLocation = (config: TFileConfig) => {
+    /**
+        * Creates a file location for logging based on the audit configuration.
+        * @example
+        * async CreateFileLocation({ fileName: "audit.log", folderName: "audit", maxSizeBytes: 1024, fullPath: "" })
+        * // Initializes file setup for audit logging.
+        * @param {TFileConfig} config - Configuration object for the audit log file.
+        * @returns {Promise<void>} Resolves when the file location is set up.
+        * @description
+        *   - Ensures that the file destination is specified in the audit options.
+        *   - Initializes separate logging files if the `splitFiles` option is enabled.
+        *   - Calls `GenerateFile` for each default file configuration when split files are used.
+        *   - Updates the `fullPath` with the created directory path.
+        */
+    private CreateFileLocation = async (config: TFileConfig) => {
         if (!this.auditOptions.destinations?.includes("file")) return;
 
         if (this.auditOptions.splitFiles) {
-            this.defaultFileConfigs.forEach(item => {
-                this.GenerateFile(item);
+            this.defaultFileConfigs.forEach(async item => {
+                await this.GenerateFile(item);
             });
             return;
         }
-        this.GenerateFile(config);
+        await this.GenerateFile(config);
     };
 
 
-    private GenerateFile = (config: TFileConfig) => {
-        const dir = createFile(config);
+    private GenerateFile = async (config: TFileConfig) => {
+        const dir = await createFile(config);
         config.fullPath = dir;
         this.logFilePath = dir;
         this.defaultFileConfigs = this.defaultFileConfigs.map(item => {

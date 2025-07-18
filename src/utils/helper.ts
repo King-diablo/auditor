@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { Request } from 'express';
-import fs from "fs";
+import fs from "fs/promises";
 import path from "path";
 import { AppConfig } from '../core/AppConfigs';
 import { AuditContentParams, TFileConfig } from '../types';
@@ -15,7 +15,7 @@ export const getUserId = (req: Request) => {
             if (!user) return "unknown";
             if ("id" in user) {
                 return user;
-            } else return "unknown";
+            }
         }
         else "unknown";
         return "unknown";
@@ -33,21 +33,22 @@ export const handleLog = (fileConfig: TFileConfig, content: any) => {
         logAuditEvent(content, fileConfig);
 };
 
-export const saveToFile = (file: TFileConfig, content: any) => {
+export const saveToFile = async (file: TFileConfig, content: any) => {
     const config = AppConfig.getAuditOption()!;
 
     try {
-        fs.appendFileSync(file.fullPath, `${JSON.stringify(content)}\n`, { encoding: "utf-8" });
+        await handleLogRotation(file);
+        await fs.appendFile(file.fullPath, `${JSON.stringify(content)}\n`, { encoding: "utf-8" });
 
     } catch (error) {
         config?.logger?.error(chalk.red("Failed to save log to file"));
     }
 };
 
-export const createFile = (config: TFileConfig) => {
+export const createFile = async (config: TFileConfig) => {
     const fullPath = path.join(process.cwd(), config.folderName);
-    if (!fs.existsSync(fullPath)) {
-        fs.mkdirSync(fullPath, { recursive: true });
+    if (!await pathExist(fullPath)) {
+        await fs.mkdir(fullPath, { recursive: true });
     }
 
     const dir = path.join(fullPath, config.fileName);
@@ -103,9 +104,8 @@ export const generateId = () => {
 };
 
 export const checkForModule = (item: string) => {
-    const requireFromUserProject = createRequire(path.join(process.cwd(), 'index.js'));
-
     try {
+        const requireFromUserProject = createRequire(path.join(process.cwd(), 'index.js'));
         AppConfig.getAuditOption()?.logger?.info(
             chalk.blueBright(`Checking for ${item}`),
         );
@@ -121,5 +121,117 @@ export const checkForModule = (item: string) => {
         return false;
     }
 };
+
+export const generateByte = (value: number = 5) => {
+    return value * 1024 * 1024;
+};
+
+
+const handleLogRotation = async (fileConfig: TFileConfig) => {
+    if (!fileLimitExceeded(fileConfig)) return;
+
+    AppConfig.getAuditOption()?.logger?.warn(chalk.yellowBright(`${fileConfig.fileName} has reached or exceeded the size limit ${formatBytes(fileConfig.maxSizeBytes)}`));
+    await createLogArchive(fileConfig);
+    await clearOriginalArchive(fileConfig);
+    await deleteArchives(fileConfig);
+};
+
+const fileLimitExceeded = async (fileConfig: TFileConfig) => {
+    return (await fs.stat(fileConfig.fullPath)).size >= fileConfig.maxSizeBytes;
+};
+
+const createLogArchive = async (fileConfig: TFileConfig) => {
+    const fullPath = path.join(process.cwd(), `${fileConfig.folderName}/archive`);
+    if (!await pathExist(fullPath)) {
+        await fs.mkdir(fullPath, { recursive: true });
+    }
+    const safeTimestamp = getTimeStamp().replace(/:/g, "-");
+    const archiveName = `${fileConfig.fileName}_${safeTimestamp}.log`;
+    const dir = path.join(fullPath, archiveName);
+
+    await fs.copyFile(fileConfig.fullPath, dir);
+};
+
+const clearOriginalArchive = async (fileConfig: TFileConfig) => {
+    await fs.writeFile(fileConfig.fullPath, "");
+};
+
+const deleteArchives = async (fileConfig: TFileConfig) => {
+    const days = AppConfig.getAuditOption()?.maxRetention ?? 0;
+    const logger = AppConfig.getAuditOption()?.logger;
+    if (days <= 0) return;
+
+    const archiveLocation = path.join(process.cwd(), `${fileConfig.folderName}/archive`);
+    if (!await pathExist(archiveLocation)) return;
+
+    const expireDate = new Date();
+    expireDate.setDate(expireDate.getDate() - days);
+
+    const files = await fs.readdir(archiveLocation);
+
+    for (const file of files) {
+        const parts = file.split("_");
+        const timeStamp = parts[1]?.replace(".log", "");
+        if (!timeStamp) continue;
+
+        let date: Date;
+        try {
+            date = restoreTimestamp(timeStamp);
+        } catch {
+            return;
+        }
+
+        if (date < expireDate) {
+            const filePath = path.join(archiveLocation, file);
+            await fs.rm(filePath);
+        } else
+            logger?.warn(chalk.yellowBright(`archive logs ${file} will be deleted soon after ${days} day(s) from now at ${expireDate}`));
+
+    }
+};
+
+function restoreTimestamp(safe: string): Date {
+    const [datePart, timePart] = safe.split('T');
+    const restoredTime = timePart.replace(/-/g, ':');
+    return new Date(`${datePart}T${restoredTime}`);
+}
+
+const pathExist = async (path: string) => {
+    try {
+        await fs.access(path);
+        return true;
+    } catch (error) {
+        AppConfig.getAuditOption()?.logger?.error(chalk.redBright("failed to located directory/file"));
+        return false;
+    }
+};
+
+
+
+/**
+* Converts a given number of bytes into a more readable string format with specified decimal places.
+* @example
+* formatBytes(1024)
+* "1 KB"
+* @param {number} bytes - The number of bytes to be converted.
+* @param {number} decimals - The number of decimal places to include in the result. Defaults to 2.
+* @returns {string} The formatted string representing the bytes in more convenient units.
+* @description
+*   - Handles different units ranging from bytes to petabytes.
+*   - Uses logarithmic calculation to determine appropriate unit.
+*/
+function formatBytes(bytes: number, decimals = 2): string {
+    if (bytes === 0) return '0 B';
+
+    const kbDefaultSize = 1024;
+    const decimalPoint = decimals < 0 ? 0 : decimals;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+
+    const convertedSize = Math.floor(Math.log(bytes) / Math.log(kbDefaultSize));
+    const size = parseFloat((bytes / kbDefaultSize ** convertedSize).toFixed(decimalPoint));
+
+    return `${size} ${sizes[convertedSize]}`;
+}
+
 
 

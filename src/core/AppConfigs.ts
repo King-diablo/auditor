@@ -28,6 +28,7 @@ export const AppConfig = (<F extends Framework>() => {
     let useUI = false;
     let defaultFileConfigs: TFileConfig[] | undefined;
     let framework: Framework = "express";
+    let maxRetention: number = 0;
 
     return {
         setAuditOption(options: TAuditOptions<F>) {
@@ -64,23 +65,29 @@ export const AppConfig = (<F extends Framework>() => {
         getIsInitialized() {
             return isInitialized;
         },
-        setCaptureSystemErrors(value: boolean) {
-            captureSystemErrors = value;
+        setCaptureSystemErrors(value: boolean | undefined) {
+            captureSystemErrors = value ?? false;
         },
         getCaptureSystemErrors() {
             return captureSystemErrors;
         },
-        setFrameWork(value: Framework) {
+        setFramework(value: Framework) {
             framework = value;
         },
-        getFrameWork() {
+        getFramework() {
             return framework;
         },
-        setUseUI(value: boolean) {
-            useUI = value;
+        setUseUI(value: boolean | undefined) {
+            useUI = value ?? false;
         },
         getUseUI() {
             return useUI;
+        },
+        setMaxRetention(value: number) {
+            maxRetention = value;
+        },
+        getMaxRetention() {
+            return maxRetention;
         },
     };
 })();

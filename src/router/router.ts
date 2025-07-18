@@ -177,7 +177,7 @@ const koaRouter = async () => {
 
 
 export const checkForFramework = () => {
-    const activeFramework = AppConfig.getFrameWork() as string;
+    const activeFramework = AppConfig.getFramework() as string;
     return checkForModule(activeFramework);
 };
 
