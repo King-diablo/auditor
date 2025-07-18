@@ -223,14 +223,14 @@ const pathExist = async (path: string) => {
 function formatBytes(bytes: number, decimals = 2): string {
     if (bytes === 0) return '0 B';
 
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
+    const kbDefaultSize = 1024;
+    const decimalPoint = decimals < 0 ? 0 : decimals;
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
 
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    const size = parseFloat((bytes / k ** i).toFixed(dm));
+    const convertedSize = Math.floor(Math.log(bytes) / Math.log(kbDefaultSize));
+    const size = parseFloat((bytes / kbDefaultSize ** convertedSize).toFixed(decimalPoint));
 
-    return `${size} ${sizes[i]}`;
+    return `${size} ${sizes[convertedSize]}`;
 }
 
 
