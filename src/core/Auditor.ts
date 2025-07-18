@@ -104,7 +104,7 @@ export class Audit<F extends Framework = "express"> {
             return;
         }
 
-    this.CreateFileLocation(this.fileConfig);
+        await this.CreateFileLocation(this.fileConfig);
 
     AppConfig.setAuditOption(this.auditOptions);
     AppConfig.setDefaultFileConfig(this.defaultFileConfigs);
@@ -348,21 +348,34 @@ export class Audit<F extends Framework = "express"> {
     }
 
 
-    private CreateFileLocation = (config: TFileConfig) => {
+    /**
+        * Creates a file location for logging based on the audit configuration.
+        * @example
+        * async CreateFileLocation({ fileName: "audit.log", folderName: "audit", maxSizeBytes: 1024, fullPath: "" })
+        * // Initializes file setup for audit logging.
+        * @param {TFileConfig} config - Configuration object for the audit log file.
+        * @returns {Promise<void>} Resolves when the file location is set up.
+        * @description
+        *   - Ensures that the file destination is specified in the audit options.
+        *   - Initializes separate logging files if the `splitFiles` option is enabled.
+        *   - Calls `GenerateFile` for each default file configuration when split files are used.
+        *   - Updates the `fullPath` with the created directory path.
+        */
+    private CreateFileLocation = async (config: TFileConfig) => {
         if (!this.auditOptions.destinations?.includes("file")) return;
 
         if (this.auditOptions.splitFiles) {
-            this.defaultFileConfigs.forEach(item => {
-                this.GenerateFile(item);
+            this.defaultFileConfigs.forEach(async item => {
+                await this.GenerateFile(item);
             });
             return;
         }
-        this.GenerateFile(config);
+        await this.GenerateFile(config);
     };
 
 
-    private GenerateFile = (config: TFileConfig) => {
-        const dir = createFile(config);
+    private GenerateFile = async (config: TFileConfig) => {
+        const dir = await createFile(config);
         config.fullPath = dir;
         this.logFilePath = dir;
         this.defaultFileConfigs = this.defaultFileConfigs.map(item => {

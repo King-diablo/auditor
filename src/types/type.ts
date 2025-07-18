@@ -91,7 +91,7 @@ export type AuditContentParams = {
 export type TEvent = TKnownEvent | TCustomEvent;
 export type TSaveContext = (config: TFileConfig, content: any) => void;
 export type TFileConfig = {
-    fileName: string,
+    fileName: string;
     folderName: string;
     fullPath: string;
     maxSizeBytes: number;
