@@ -1,4 +1,4 @@
-import { Framework, TAuditOptions, TFileConfig } from "../types";
+import { Framework, TAuditOptions, TFileConfig, TRemoteConfig } from "../types";
 
 /**
  * Singleton configuration manager for the application.
@@ -29,6 +29,7 @@ export const AppConfig = (<F extends Framework>() => {
     let defaultFileConfigs: TFileConfig[] | undefined;
     let framework: Framework = "express";
     let maxRetention: number = 0;
+    let remoteToken: undefined | TRemoteConfig;
 
     return {
         setAuditOption(options: TAuditOptions<F>) {
@@ -88,6 +89,12 @@ export const AppConfig = (<F extends Framework>() => {
         },
         getMaxRetention() {
             return maxRetention;
+        },
+        setRemoteToken(value?: TRemoteConfig) {
+            remoteToken = value;
+        },
+        getRemoteToken() {
+            return remoteToken;
         },
     };
 })();

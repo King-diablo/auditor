@@ -125,3 +125,7 @@ export type Logger = {
     warn: (...args: any[]) => void;
 }
 
+export type TRemoteConfig = {
+    url: string,
+    token: string;
+};

@@ -316,15 +316,27 @@ app.use(audit.ErrorLogger());
 -   [x] File-based JSON logging
 -   [x] **Database audit** — log database operations for Mongoose (MongoDB) and Prisma
 -   [x] Audit UI support for Express, Fastify, and Koa
+-   [x] Remote logging transport
+-   [x] More configuration options: log rotation
 -   [ ] Sequelize support (planned)
--   [ ] Remote logging transport (planned)
--   [ ] More configuration options: log rotation
 
 ---
 
 ## 📋 Changelog
 
 See the [CHANGELOG.md](./CHANGELOG.md) for full release notes.
+
+---
+
+## 📤 RemoteLogging
+
+See the [REMOTE_LOGGING.md](./REMOTE_LOGGING.md) for more information
+
+---
+
+## 🪵 More On Log Rotation
+
+See the [LOG_RETENTION.md](./LOG_RETENTION.md.md) for more information
 
 ---
 
