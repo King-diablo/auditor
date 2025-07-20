@@ -1,11 +1,12 @@
 import chalk from 'chalk';
+import crypto from "crypto";
 import { Request } from 'express';
 import fs from "fs/promises";
+import { createRequire } from 'module';
 import path from "path";
 import { AppConfig } from '../core/AppConfigs';
+import { betterStack } from '../remote';
 import { AuditContentParams, TFileConfig } from '../types';
-import crypto from "crypto";
-import { createRequire } from 'module';
 
 export const getTimeStamp = () => new Date().toISOString();
 export const getUserId = (req: Request) => {
@@ -29,20 +30,10 @@ export const handleLog = (fileConfig: TFileConfig, content: any) => {
 
     if (config.destinations?.includes("console"))
         logAuditEvent(content);
+    if (config.destinations?.includes("remote"))
+        logAuditEvent(content);
     if (config.destinations?.includes("file"))
         logAuditEvent(content, fileConfig);
-};
-
-export const saveToFile = async (file: TFileConfig, content: any) => {
-    const config = AppConfig.getAuditOption()!;
-
-    try {
-        await handleLogRotation(file);
-        await fs.appendFile(file.fullPath, `${JSON.stringify(content)}\n`, { encoding: "utf-8" });
-
-    } catch (error) {
-        config?.logger?.error(chalk.red("Failed to save log to file"));
-    }
 };
 
 export const createFile = async (config: TFileConfig) => {
@@ -63,10 +54,29 @@ export const logAuditEvent = (content: any, file?: TFileConfig) => {
         return;
     }
 
+    if (config.destinations?.includes("remote")) {
+        betterStack(content).catch(err => AppConfig.getAuditOption()?.logger?.error(chalk.redBright("failed to send log to remote source", err)));
+        return;
+    }
+
     const cleanContent = { ...content };
     delete cleanContent.fullStack;
 
     config?.logger?.info(cleanContent);
+
+
+};
+
+const saveToFile = async (file: TFileConfig, content: any) => {
+    const config = AppConfig.getAuditOption()!;
+
+    try {
+        await handleLogRotation(file);
+        await fs.appendFile(file.fullPath, `${JSON.stringify(content)}\n`, { encoding: "utf-8" });
+
+    } catch (error) {
+        config?.logger?.error(chalk.redBright("Failed to save log to file", error));
+    }
 };
 
 export const getFileLocation = (location: string) => {
@@ -128,7 +138,7 @@ export const generateByte = (value: number = 5) => {
 
 
 const handleLogRotation = async (fileConfig: TFileConfig) => {
-    if (!fileLimitExceeded(fileConfig)) return;
+    if (!await fileLimitExceeded(fileConfig)) return;
 
     AppConfig.getAuditOption()?.logger?.warn(chalk.yellowBright(`${fileConfig.fileName} has reached or exceeded the size limit ${formatBytes(fileConfig.maxSizeBytes)}`));
     await createLogArchive(fileConfig);
@@ -137,7 +147,9 @@ const handleLogRotation = async (fileConfig: TFileConfig) => {
 };
 
 const fileLimitExceeded = async (fileConfig: TFileConfig) => {
-    return (await fs.stat(fileConfig.fullPath)).size >= fileConfig.maxSizeBytes;
+    const statsSize = (await fs.stat(fileConfig.fullPath)).size;
+
+    return statsSize >= fileConfig.maxSizeBytes;
 };
 
 const createLogArchive = async (fileConfig: TFileConfig) => {

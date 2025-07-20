@@ -3,14 +3,16 @@ import { auditModel, checkForMongodb } from "../database/mongodb";
 import { auditPrisma, checkForPrisma } from "../database/prisma";
 import { errorLogger, requestLogger } from "../middleware";
 import { UIRouter, checkForFramework, downloadDependency } from "../router";
-import { DBInstance, Framework, SupportedLoggersRequest, TAuditOptions, TEvent, TFileConfig } from "../types/type";
-import { createFile, generateAuditContent, generateByte, getFileLocation, handleLog, logAuditEvent } from "../utils";
+import { DBInstance, Framework, SupportedLoggersRequest, TAuditOptions, TEvent, TFileConfig, TRemoteConfig } from "../types/type";
+import { createFile, generateAuditContent, generateByte, getFileLocation, handleLog } from "../utils";
 import { userProfile } from "../utils/user";
 import { AppConfig } from "./AppConfigs";
 
 
 export class Audit<F extends Framework = "express"> {
     private logFilePath: string = "";
+    private remoteConfig?: TRemoteConfig;
+
     private defaultFileConfigs: TFileConfig[] = [
         {
             fileName: "error.log",
@@ -99,64 +101,70 @@ export class Audit<F extends Framework = "express"> {
      * Should be called before performing any audit operations to ensure the environment is properly configured.
      */
     async Setup() {
+
         if (this.isInitialized) {
             this.auditOptions.logger?.warn(chalk.yellow("Audit already initialized."));
             return;
         }
 
+        if (this.auditOptions.destinations?.includes("remote") && (!this.remoteConfig?.token || !this.remoteConfig?.url)) {
+            this.auditOptions.logger?.warn(chalk.yellowBright("betterStack token is required inOrder to send logs"));
+        }
+
         await this.CreateFileLocation(this.fileConfig);
 
-    AppConfig.setAuditOption(this.auditOptions);
-    AppConfig.setDefaultFileConfig(this.defaultFileConfigs);
-    AppConfig.setFileConfig(this.fileConfig);
-    AppConfig.setLogFilePath(this.logFilePath);
-    AppConfig.setCaptureSystemErrors(this.auditOptions.captureSystemErrors);
-    AppConfig.setFramework(this.auditOptions.framework!);
-    AppConfig.setUseUI(this.auditOptions.useUI);
-    AppConfig.setMaxRetention(this.auditOptions.maxRetention ?? 0);
+        AppConfig.setAuditOption(this.auditOptions);
+        AppConfig.setDefaultFileConfig(this.defaultFileConfigs);
+        AppConfig.setFileConfig(this.fileConfig);
+        AppConfig.setLogFilePath(this.logFilePath);
+        AppConfig.setCaptureSystemErrors(this.auditOptions.captureSystemErrors);
+        AppConfig.setFramework(this.auditOptions.framework!);
+        AppConfig.setUseUI(this.auditOptions.useUI);
+        AppConfig.setMaxRetention(this.auditOptions.maxRetention ?? 0);
+        AppConfig.setRemoteToken(this.remoteConfig);
 
-    if (this.auditOptions.dbType === "mongoose") {
-        const result = checkForMongodb();
-        if (!result) return;
-    }
-
-    if (this.auditOptions.dbType === "prisma") {
-        const result = checkForPrisma();
-        if (!result) return;
-    }
-
-    if (this.auditOptions.useUI) {
-        const hasFramework = checkForFramework();
-        if (hasFramework) {
-            AppConfig.getAuditOption()?.logger?.info(chalk.yellow("In order to use this module some dependency will be downloaded"));
-            await downloadDependency();
+        if (this.auditOptions.dbType === "mongoose") {
+            const result = checkForMongodb();
+            if (!result) return;
         }
+
+        if (this.auditOptions.dbType === "prisma") {
+            const result = checkForPrisma();
+            if (!result) return;
+        }
+
+        if (this.auditOptions.useUI) {
+            const hasFramework = checkForFramework();
+            if (hasFramework) {
+                AppConfig.getAuditOption()?.logger?.info(chalk.yellow("In order to use this module some dependency will be downloaded"));
+                await downloadDependency();
+            }
+        }
+
+
+
+        this.isInitialized = true;
+        AppConfig.setIsInitialized(this.isInitialized);
+
+        this.HandleSystemErrors();
+
+        this.auditOptions.logger?.info(chalk.green("Default Audit config set successfully"));
     }
 
 
-
-    this.isInitialized = true;
-    AppConfig.setIsInitialized(this.isInitialized);
-
-    this.HandleSystemErrors();
-
-    this.auditOptions.logger?.info(chalk.green("Default Audit config set successfully"));
-}
-
-
-/**
-    * Logs an event based on audit configuration to specified destinations such as console and/or file.
-    * @example
-    * Log({type: "info", action: "login", message: "User logged in"})
-    * Logs the provided event according to configured destinations and options.
-    * @param {TEvent} event - The event object to be logged, which includes the type, action, and message.
-    * @returns {void} Does not return a value.
-    * @description
-    *   - Checks for missing event details such as type, action, or message before logging.
-    *   - Utilizes `generateAuditContent` to structure the event data.
-    *   - Ensures logging operations do not proceed if the auditor is uninitialized.
-    *   - Handles file path validation when logging to files, especially in split file configurations.
-    */
+    /**
+        * Logs an event based on audit configuration to specified destinations such as console and/or file.
+        * @example
+        * Log({type: "info", action: "login", message: "User logged in"})
+        * Logs the provided event according to configured destinations and options.
+        * @param {TEvent} event - The event object to be logged, which includes the type, action, and message.
+        * @returns {void} Does not return a value.
+        * @description
+        *   - Checks for missing event details such as type, action, or message before logging.
+        *   - Utilizes `generateAuditContent` to structure the event data.
+        *   - Ensures logging operations do not proceed if the auditor is uninitialized.
+        *   - Handles file path validation when logging to files, especially in split file configurations.
+        */
     Log(event: TEvent) {
 
         if (processEmptyLog(event)) return;
@@ -169,7 +177,7 @@ export class Audit<F extends Framework = "express"> {
         }
 
         if (this.auditOptions.destinations?.includes("console")) {
-            logAuditEvent(item);
+            handleLog(this.fileConfig, item);
         }
 
         if (this.auditOptions.destinations?.includes("file")) {
@@ -182,9 +190,17 @@ export class Audit<F extends Framework = "express"> {
                 return;
             }
 
-            logAuditEvent(item, file);
+            handleLog(file, item);
         }
 
+        if (this.auditOptions.destinations?.includes("remote")) {
+            if (!this.remoteConfig?.url || !this.remoteConfig.token) {
+                this.auditOptions.logger?.error(chalk.redBright("Token from telemetry.betterStack is required"));
+                return;
+            }
+
+            handleLog(this.fileConfig, item);
+        }
     }
 
     /**
@@ -226,7 +242,7 @@ export class Audit<F extends Framework = "express"> {
         });
 
         if (this.auditOptions.destinations?.includes("console")) {
-            logAuditEvent(item);
+            handleLog(this.fileConfig, item);
         }
 
         if (this.auditOptions.destinations?.includes("file")) {
@@ -235,28 +251,37 @@ export class Audit<F extends Framework = "express"> {
             const file = this.auditOptions.splitFiles ? actionFile : this.fileConfig;
 
             if (!file.fullPath) {
-                this.auditOptions.logger?.error(chalk.red("Unable to locate file path"));
+                this.auditOptions.logger?.error(chalk.redBright("Unable to locate file path"));
                 return;
             }
 
-            logAuditEvent(item, file);
+            handleLog(file, item);
+        }
+
+        if (this.auditOptions.destinations?.includes("remote")) {
+            if (!this.remoteConfig?.url || !this.remoteConfig.token) {
+                this.auditOptions.logger?.error(chalk.redBright("Token from telemetry.betterStack is required"));
+                return;
+            }
+
+            handleLog(this.fileConfig, item);
         }
 
     }
 
 
-/**
-    * Audits a database model based on the provided schema.
-    * @example
-    * auditModel(mongooseSchema) or auditModel(prismaClient)
-    * Initializes database operation auditing on a Mongoose schema or Prisma client.
-    * @param {DBInstance} schema - The database instance or schema to audit.
-    * @returns {void} Does not return a value.
-    * @description
-    *   - Only functions if a schema and a valid database type are provided.
-    *   - Mongoose audit will only occur if dbType is specifically set to "mongoose".
-    *   - Prisma audit operates if dbType is set to "prisma" with a valid PrismaClient instance.
-    */
+    /**
+        * Audits a database model based on the provided schema.
+        * @example
+        * auditModel(mongooseSchema) or auditModel(prismaClient)
+        * Initializes database operation auditing on a Mongoose schema or Prisma client.
+        * @param {DBInstance} schema - The database instance or schema to audit.
+        * @returns {void} Does not return a value.
+        * @description
+        *   - Only functions if a schema and a valid database type are provided.
+        *   - Mongoose audit will only occur if dbType is specifically set to "mongoose".
+        *   - Prisma audit operates if dbType is set to "prisma" with a valid PrismaClient instance.
+        */
     AuditModel(schema: DBInstance) {
         if (!schema) {
             this.auditOptions.logger?.error(chalk.red("No schema or client provided"));
@@ -302,6 +327,24 @@ export class Audit<F extends Framework = "express"> {
             fileName,
             fullPath: "",
         };
+    }
+
+    /**
+        * Sets the remote token and remote audits.
+        * @example
+        * SetRemoteConfig("yourRemoteToken")
+        * // Sets the remote token for telemetry.betterStack.
+        * @param {string} token - The remote token used for configuring remote logging services.
+        * @returns {void} Does not return a value.
+        * @description
+        *   - Necessary for remote logging, especially when using external telemetry services.
+        */
+    SetRemoteConfig(config: TRemoteConfig) {
+        if (this.isInitialized) {
+            AppConfig.getAuditOption()?.logger?.error(chalk.redBright("Must be configured before setup"));
+            return;
+        }
+        this.remoteConfig = config;
     }
 
     /**
