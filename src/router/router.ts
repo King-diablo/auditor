@@ -43,22 +43,32 @@ const getLogs = () => {
     return item.sort((a, b) => b.timeStamp.localeCompare(a.timeStamp));
 };
 
+type TExpressRouter = {
+    Username: string,
+    Password: string,
+    Secret: string;
+}
 
 /**
- * Asynchronously creates and configures an Express router for serving the audit UI and logs.
- *
- * - Dynamically imports the `express` module. If `express` is not installed, logs a message and returns a no-op middleware.
- * - Serves static files from the `uiPath` directory.
- * - Handles GET requests to `/audit-ui` by serving the main UI HTML file.
- * - Handles GET requests to `/audit-log` by returning audit logs as JSON.
- *
- * @returns {Promise<import("express").Router | import("express").RequestHandler>} 
- *   A Promise that resolves to an Express router instance, or a no-op middleware if `express` is not available.
- */
-const expressRouter = async () => {
+* Sets up Express routes for authentication and logging with optional credentials.
+* @example
+* expressRouter({Username: "admin", Password: "admin", secret: "yourSecretKey"})
+* returns Express Router instance
+* @param {TExpressRouter} {Username="admin", Password="admin", secret} - Configuration for Express Router including default credentials and a secret.
+* @returns {Router} Returns an Express Router configured with routes for authentication and log display.
+* @description
+*   - If `secret` is not provided, the function logs an error and allows progression without middleware blocking.
+*   - Requests to the '/audit-log' route require a valid session cookie set by successful authentication.
+*   - Post route authentication requires base64-encoded credentials combining username, password, and secret query parameters.
+*/
+const expressRouter = async ({ Username = "admin", Password = "admin", Secret }: TExpressRouter) => {
     let express;
     try {
         express = await import("express");
+        if (!Secret) {
+            AppConfig.getAuditOption()?.logger?.info(chalk.redBright("You must provide a secret to use this route"));
+            return (req: any, res: any, next: any) => next();
+        }
     } catch (error) {
         AppConfig.getAuditOption()?.logger?.info(chalk.redBright("Please install express in order to use this module"));
         return (req: any, res: any, next: any) => next();
@@ -66,14 +76,91 @@ const expressRouter = async () => {
 
     const router = express.Router();
 
+    router.use(express.json());
     router.use(express.static(uiPath));
 
-    router.get('/audit-ui', (_req, res) => {
+    router.post('/login', (req: any, res: any) => {
+        const incomingCredentials = req.body;
+
+        if (!incomingCredentials?.id) {
+            res.statusMessage = "Missing information";
+            return res.status(404).json({ message: "Id is required" });
+        }
+
+        const decodedString = atob(incomingCredentials.id);
+
+        const [username, password] = decodedString.split(':');
+
+        const credentials = btoa(`${Username}:${Password}:${Secret}`);
+
+        if (username != Username) return res.status(400).json({ message: "incorrect username" });
+        if (password != Password) return res.status(400).json({ message: "incorrect password" });
+
+        res.statusMessage = "Authenticated";
+
+        return res.redirect(303, `/audit-ui?id=${encodeURIComponent(credentials)}`);
+    });
+
+    router.get('/auth-ui', (req, res) => {
+        res.statusMessage = "Fetched auth UI";
+        res.sendFile(path.join(uiPath, "auth.html"));
+    });
+
+    router.get('/audit-ui', (req: any, res: any) => {
+        const credentials = req.query.id;
+
+        if (!credentials) return res.redirect(303, "/auth-ui");
+
+        try {
+            const decodedString = atob(credentials as string);
+
+            const [username, password, secret] = decodedString.split(':');
+
+            if (username != Username) return res.redirect(303, "/auth-ui");
+            if (password != Password) return res.redirect(303, "/auth-ui");
+            if (secret != Secret) return res.redirect(303, "/auth-ui");
+
+            req.headers.cookie?.split(';').forEach((cookie: any) => {
+                const [name, value] = cookie.trim().split('=');
+                if (name === "session") return;
+                res.setHeader('Set-Cookie', [
+                    `session=${credentials}; ` +
+                    `Path=/; ` +
+                    `HttpOnly; ` +
+                    `SameSite=Strict`,
+                ]);
+            });
+
+
+        } catch (error) {
+            return res.redirect(303, "/auth-ui");
+        }
+
         res.statusMessage = "Fetched audit UI";
+
         res.sendFile(path.join(uiPath, "index.html"));
     });
 
-    router.get('/audit-log', (_req, res) => {
+    router.get('/audit-log', (req: any, res: any) => {
+
+        let session = null;
+
+        req.headers.cookie?.split(';').forEach((cookie: any) => {
+            const [name, value] = cookie.trim().split('=');
+            if (name === "session") session = value;
+        });
+
+        if (!session) return res.status(403).send('Forbidden');
+
+        const decodedString = atob(session);
+
+        const [username, password, secret] = decodedString.split(':');
+
+        if (username != Username) return res.status(403).send('Forbidden');
+        if (password != Password) return res.status(403).send('Forbidden');
+        if (secret != Secret) return res.status(403).send('Forbidden');
+
+
         const logs = getLogs();
         res.statusMessage = "Fetched audit logs";
         res.status(200).json({ logs });
