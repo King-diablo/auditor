@@ -6,6 +6,8 @@ import { pipeline } from 'stream/promises';
 import { fileURLToPath } from "url";
 import { AppConfig } from "../core/AppConfigs";
 import { checkForModule } from "../utils";
+import { createKoaRouter } from "./koaRouter";
+import { TRouter } from "../types";
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -43,25 +45,21 @@ const getLogs = () => {
     return item.sort((a, b) => b.timeStamp.localeCompare(a.timeStamp));
 };
 
-type TExpressRouter = {
-    Username: string,
-    Password: string,
-    Secret: string;
-}
+
 
 /**
 * Sets up Express routes for authentication and logging with optional credentials.
 * @example
 * expressRouter({Username: "admin", Password: "admin", secret: "yourSecretKey"})
 * returns Express Router instance
-* @param {TExpressRouter} {Username="admin", Password="admin", secret} - Configuration for Express Router including default credentials and a secret.
+* @param {TRouter} {Username="admin", Password="admin", secret} - Configuration for Express Router including default credentials and a secret.
 * @returns {Router} Returns an Express Router configured with routes for authentication and log display.
 * @description
 *   - If `secret` is not provided, the function logs an error and allows progression without middleware blocking.
 *   - Requests to the '/audit-log' route require a valid session cookie set by successful authentication.
 *   - Post route authentication requires base64-encoded credentials combining username, password, and secret query parameters.
 */
-const expressRouter = async ({ Username = "admin", Password = "admin", Secret }: TExpressRouter) => {
+const expressRouter = async ({ Username = "admin", Password = "admin", Secret }: TRouter) => {
     let express;
     try {
         express = await import("express");
@@ -218,49 +216,7 @@ const fastifyRouter = async () => {
     };
 };
 
-/**
-* Initializes a Koa router for serving audit-related endpoints
-* @example
-* koaRouter()
-* @returns {Function} Middleware function composed with Koa static server and router.
-* @description
-*   - Dynamically imports necessary Koa modules and registers routes.
-*   - Serves the audit UI from a static HTML file.
-*   - Returns the audit logs in JSON format.
-*   - Logs a message if required packages are not installed.
-*/
-const koaRouter = async () => {
-    let Router, serve, compose;
-
-    try {
-        Router = (await import('@koa/router')).default;
-        serve = (await import('koa-static')).default;
-        compose = (await import('koa-compose')).default;
-    } catch {
-        AppConfig.getAuditOption()?.logger?.info(
-            chalk.redBright("Please install koa, @koa/router, koa-static, and koa-compose to use the audit UI."),
-        );
-        return async (ctx: any, next: any) => await next();
-    }
-
-    const router = new Router();
-
-
-    router.get('/audit-ui', (ctx: any) => {
-        ctx.type = 'html';
-        ctx.body = fs.createReadStream(path.join(uiPath, 'index.html'));
-    });
-
-    router.get('/audit-log', (ctx: any) => {
-        ctx.body = { logs: getLogs() };
-    });
-
-    return compose([
-        serve(uiPath),
-        router.routes(),
-        router.allowedMethods(),
-    ]);
-};
+const koaRouter = createKoaRouter(uiPath);
 
 
 export const checkForFramework = () => {
