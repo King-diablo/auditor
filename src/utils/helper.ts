@@ -246,4 +246,39 @@ function formatBytes(bytes: number, decimals = 2): string {
 }
 
 
+export const getLogs = async () => {
+    const hasSplitFiles = AppConfig.getAuditOption()?.splitFiles;
+    const file = AppConfig.getFileConfig();
 
+    if (hasSplitFiles) {
+        const files = AppConfig.getDefaultFileConfig();
+        if (!files) return [];
+
+        const data = await Promise.all(
+            files.map(async (item) => {
+                const logData = await fs.readFile(item.fullPath, "utf-8");
+                return logData
+                    .trim()
+                    .split("\n")
+                    .filter(Boolean)
+                    .map((line, i) => ({
+                        id: i,
+                        ...JSON.parse(line),
+                    }));
+            }),
+        );
+
+        const logs = data.flat();
+        return logs.sort((a, b) => b.timeStamp.localeCompare(a.timeStamp));
+    }
+
+    if (!file) return [];
+
+    const logData = await fs.readFile(file.fullPath, "utf-8");
+    const item = logData.trim().split("\n").filter(Boolean).map((line, i) => ({
+        id: i,
+        ...JSON.parse(line),
+    }));
+
+    return item.sort((a, b) => b.timeStamp.localeCompare(a.timeStamp));
+};

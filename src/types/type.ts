@@ -129,3 +129,9 @@ export type TRemoteConfig = {
     url: string,
     token: string;
 };
+
+export type TRouter = {
+    Username: string,
+    Password: string,
+    Secret: string;
+};
