@@ -8,6 +8,7 @@ import { AppConfig } from "../core/AppConfigs";
 import { checkForModule } from "../utils";
 import { createKoaRouter } from "./koaRouter";
 import { TRouter } from "../types";
+import { createFastifyRouter } from "./fastifyRouter";
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -167,57 +168,8 @@ const expressRouter = async ({ Username = "admin", Password = "admin", Secret }:
     return router;
 };
 
-/**
- * Asynchronously creates a Fastify plugin for serving static files and API endpoints.
- *
- * This function attempts to dynamically import the `@fastify/static` module. If the import fails,
- * it returns a no-op async function. Otherwise, it returns an async function that registers the static
- * file handler and sets up two routes:
- * 
- * - `/audit-ui`: Serves the `index.html` file as an HTML response.
- * - `/audit-log`: Returns audit logs as a JSON object.
- *
- * @returns {Promise<(fastify: any, opts: any) => Promise<void>>} A promise that resolves to a Fastify plugin function.
- */
-const fastifyRouter = async () => {
-
-    let fastifyStatic;
-    try {
-        fastifyStatic = await import('@fastify/static');
-    } catch {
-        return async () => { };
-    }
-
-    return async function (fastify: any, opts: any) {
-        await fastify.register(fastifyStatic.default, {
-            root: uiPath,
-            prefix: '/',
-        });
-
-        /**
-                * Sends an HTML file as the response for the '/audit-ui' route in Fastify.
-                * @example
-                * (_req, reply) => {
-                *   reply.type('text/html').sendFile('index.html');
-                * }
-                * @param {any} _ - The incoming request object (not used in this function).
-                * @param {any} reply - The Fastify reply object used to send responses.
-                * @description
-                *   - This function sets the response type to 'text/html'.
-                *   - It sends 'index.html' located in the static files directory specified in uiPath.
-                */
-        fastify.get('/audit-ui', (_: any, reply: any) => {
-            reply.type('text/html').sendFile('index.html');
-        });
-
-        fastify.get('/audit-log', (_: any, reply: any) => {
-            reply.send({ logs: getLogs() });
-        });
-    };
-};
-
 const koaRouter = createKoaRouter(uiPath);
-
+const fastifyRouter = createFastifyRouter(uiPath);
 
 export const checkForFramework = () => {
     const activeFramework = AppConfig.getFramework() as string;
