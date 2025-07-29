@@ -1,173 +1,21 @@
 import chalk from "chalk";
-import fs, { createWriteStream, existsSync } from 'fs';
+import { createWriteStream, existsSync } from 'fs';
 import path from "path";
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { fileURLToPath } from "url";
 import { AppConfig } from "../core/AppConfigs";
 import { checkForModule } from "../utils";
-import { createKoaRouter } from "./koaRouter";
-import { TRouter } from "../types";
+import { createExpressRouter } from "./expressRouter";
 import { createFastifyRouter } from "./fastifyRouter";
+import { createKoaRouter } from "./koaRouter";
 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uiPath = path.join(__dirname, "ui");
 
-
-const getLogs = () => {
-    const hasSplitFiles = AppConfig.getAuditOption()?.splitFiles;
-    const file = AppConfig.getFileConfig();
-
-    if (hasSplitFiles) {
-        const files = AppConfig.getDefaultFileConfig();
-        if (!files) return [];
-
-        const data = files.flatMap((item) => {
-            const logData = fs.readFileSync(item.fullPath, "utf-8");
-            return logData.trim().split("\n").filter(Boolean).map((line, i) => ({
-                id: i,
-                ...JSON.parse(line),
-            }));
-        });
-
-        return data.sort((a, b) => b.timeStamp.localeCompare(a.timeStamp));
-    }
-
-    if (!file) return [];
-
-    const logData = fs.readFileSync(file.fullPath, "utf-8");
-    const item = logData.trim().split("\n").filter(Boolean).map((line, i) => ({
-        id: i,
-        ...JSON.parse(line),
-    }));
-
-    return item.sort((a, b) => b.timeStamp.localeCompare(a.timeStamp));
-};
-
-
-
-/**
-* Sets up Express routes for authentication and logging with optional credentials.
-* @example
-* expressRouter({Username: "admin", Password: "admin", secret: "yourSecretKey"})
-* returns Express Router instance
-* @param {TRouter} {Username="admin", Password="admin", secret} - Configuration for Express Router including default credentials and a secret.
-* @returns {Router} Returns an Express Router configured with routes for authentication and log display.
-* @description
-*   - If `secret` is not provided, the function logs an error and allows progression without middleware blocking.
-*   - Requests to the '/audit-log' route require a valid session cookie set by successful authentication.
-*   - Post route authentication requires base64-encoded credentials combining username, password, and secret query parameters.
-*/
-const expressRouter = async ({ Username = "admin", Password = "admin", Secret }: TRouter) => {
-    let express;
-    try {
-        express = await import("express");
-        if (!Secret) {
-            AppConfig.getAuditOption()?.logger?.info(chalk.redBright("You must provide a secret to use this route"));
-            return (req: any, res: any, next: any) => next();
-        }
-    } catch (error) {
-        AppConfig.getAuditOption()?.logger?.info(chalk.redBright("Please install express in order to use this module"));
-        return (req: any, res: any, next: any) => next();
-    }
-
-    const router = express.Router();
-
-    router.use(express.json());
-    router.use(express.static(uiPath));
-
-    router.post('/login', (req: any, res: any) => {
-        const incomingCredentials = req.body;
-
-        if (!incomingCredentials?.id) {
-            res.statusMessage = "Missing information";
-            return res.status(404).json({ message: "Id is required" });
-        }
-
-        const decodedString = atob(incomingCredentials.id);
-
-        const [username, password] = decodedString.split(':');
-
-        const credentials = btoa(`${Username}:${Password}:${Secret}`);
-
-        if (username != Username) return res.status(400).json({ message: "incorrect username" });
-        if (password != Password) return res.status(400).json({ message: "incorrect password" });
-
-        res.statusMessage = "Authenticated";
-
-        return res.redirect(303, `/audit-ui?id=${encodeURIComponent(credentials)}`);
-    });
-
-    router.get('/auth-ui', (req, res) => {
-        res.statusMessage = "Fetched auth UI";
-        res.sendFile(path.join(uiPath, "auth.html"));
-    });
-
-    router.get('/audit-ui', (req: any, res: any) => {
-        const credentials = req.query.id;
-
-        if (!credentials) return res.redirect(303, "/auth-ui");
-
-        try {
-            const decodedString = atob(credentials as string);
-
-            const [username, password, secret] = decodedString.split(':');
-
-            if (username != Username) return res.redirect(303, "/auth-ui");
-            if (password != Password) return res.redirect(303, "/auth-ui");
-            if (secret != Secret) return res.redirect(303, "/auth-ui");
-
-            req.headers.cookie?.split(';').forEach((cookie: any) => {
-                const [name, value] = cookie.trim().split('=');
-                if (name === "session") return;
-                res.setHeader('Set-Cookie', [
-                    `session=${credentials}; ` +
-                    `Path=/; ` +
-                    `HttpOnly; ` +
-                    `SameSite=Strict`,
-                ]);
-            });
-
-
-        } catch (error) {
-            return res.redirect(303, "/auth-ui");
-        }
-
-        res.statusMessage = "Fetched audit UI";
-
-        res.sendFile(path.join(uiPath, "index.html"));
-    });
-
-    router.get('/audit-log', (req: any, res: any) => {
-
-        let session = null;
-
-        req.headers.cookie?.split(';').forEach((cookie: any) => {
-            const [name, value] = cookie.trim().split('=');
-            if (name === "session") session = value;
-        });
-
-        if (!session) return res.status(403).send('Forbidden');
-
-        const decodedString = atob(session);
-
-        const [username, password, secret] = decodedString.split(':');
-
-        if (username != Username) return res.status(403).send('Forbidden');
-        if (password != Password) return res.status(403).send('Forbidden');
-        if (secret != Secret) return res.status(403).send('Forbidden');
-
-
-        const logs = getLogs();
-        res.statusMessage = "Fetched audit logs";
-        res.status(200).json({ logs });
-    });
-
-    return router;
-};
-
+const expressRouter = createExpressRouter(uiPath);
 const koaRouter = createKoaRouter(uiPath);
 const fastifyRouter = createFastifyRouter(uiPath);
 
@@ -191,6 +39,18 @@ export const UIRouter = {
 };
 
 
+/**
+* Downloads necessary dependencies if they do not already exist locally.
+* @example
+* downloadDependency()
+* No direct return value, performs asynchronous file download operations.
+* @returns {Promise<void>} Completes once all files are downloaded. No explicit return value.
+* @description
+*   - Utilizes the `downloadFile` function to fetch files from specified URLs.
+*   - Checks local existence of files to avoid redundant downloads.
+*   - Logs progress and errors using the application's logging configuration.
+*   - Downloads occur in sequence, ensuring operations are completed orderly.
+*/
 export const downloadDependency = async () => {
     const logger = AppConfig.getAuditOption()?.logger;
     await downloadFile('https://cdn.jsdelivr.net/npm/chart.js', 'chart.min.js');
