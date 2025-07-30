@@ -71,7 +71,6 @@ const saveToFile = async (file: TFileConfig, content: any) => {
     const config = AppConfig.getAuditOption()!;
 
     try {
-        await handleLogRotation(file);
         await fs.appendFile(file.fullPath, `${JSON.stringify(content)}\n`, { encoding: "utf-8" });
 
     } catch (error) {
@@ -137,13 +136,15 @@ export const generateByte = (value: number = 5) => {
 };
 
 
-const handleLogRotation = async (fileConfig: TFileConfig) => {
-    if (!await fileLimitExceeded(fileConfig)) return;
+export const handleLogRotation = async () => {
+    const activeFile = AppConfig.getFileConfig()!;
+    const config = AppConfig.getAuditOption();
+    if (canDeleteArchive()) deleteArchives(activeFile);
+    if (!await fileLimitExceeded(activeFile)) return;
 
-    AppConfig.getAuditOption()?.logger?.warn(chalk.yellowBright(`${fileConfig.fileName} has reached or exceeded the size limit ${formatBytes(fileConfig.maxSizeBytes)}`));
-    await createLogArchive(fileConfig);
-    await clearOriginalArchive(fileConfig);
-    await deleteArchives(fileConfig);
+    config?.logger?.warn(chalk.yellowBright(`${activeFile.fileName} has reached or exceeded the size limit ${formatBytes(activeFile.maxSizeBytes)}`));
+    await createLogArchive(activeFile);
+    await clearOriginalArchive(activeFile);
 };
 
 const fileLimitExceeded = async (fileConfig: TFileConfig) => {
@@ -169,9 +170,11 @@ const clearOriginalArchive = async (fileConfig: TFileConfig) => {
 };
 
 const deleteArchives = async (fileConfig: TFileConfig) => {
+
+    if (!canDeleteArchive()) return;
+
     const days = AppConfig.getAuditOption()?.maxRetention ?? 0;
     const logger = AppConfig.getAuditOption()?.logger;
-    if (days <= 0) return;
 
     const archiveLocation = path.join(process.cwd(), `${fileConfig.folderName}/archive`);
     if (!await pathExist(archiveLocation)) return;
@@ -202,6 +205,12 @@ const deleteArchives = async (fileConfig: TFileConfig) => {
     }
 };
 
+const canDeleteArchive = () => {
+    const days = AppConfig.getAuditOption()?.maxRetention ?? 0;
+    const result = (days > 0);
+    return result;
+};
+
 function restoreTimestamp(safe: string): Date {
     const [datePart, timePart] = safe.split('T');
     const restoredTime = timePart.replace(/-/g, ':');
@@ -213,7 +222,7 @@ const pathExist = async (path: string) => {
         await fs.access(path);
         return true;
     } catch (error) {
-        AppConfig.getAuditOption()?.logger?.error(chalk.redBright("failed to located directory/file"));
+        AppConfig.getAuditOption()?.logger?.error(chalk.redBright(`failed to located directory/file at ${path}`));
         return false;
     }
 };
