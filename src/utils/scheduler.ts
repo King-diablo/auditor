@@ -4,8 +4,6 @@ const tasks: any[] = [];
 let timer: null | NodeJS.Timeout = null;
 
 const runDailyAtMidnight = () => {
-    console.log("creating schedule");
-
     function scheduleNext() {
         const now = new Date();
         const next = new Date();
@@ -21,7 +19,6 @@ const runDailyAtMidnight = () => {
     }
 
     scheduleNext();
-    console.log("creating schedule done");
 };
 
 export const beginSchedule = () => runDailyAtMidnight();
