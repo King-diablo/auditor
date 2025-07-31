@@ -64,9 +64,9 @@ const expressRouter = async ({ Username = "admin", Password = "admin", Secret }:
 
         res.cookie('session', credentials, {
             httpOnly: true,
-            secure: false, // set to false in dev if not using HTTPS
+            secure: false,         
             sameSite: 'Strict',
-            maxAge: '3600',
+            maxAge: 3600 * 1000,
         });
 
         return res.redirect(303, `/audit-ui`);
@@ -98,6 +98,13 @@ const expressRouter = async ({ Username = "admin", Password = "admin", Secret }:
         if (username != Username) return res.redirect(303, "/auth-ui");
         if (password != Password) return res.redirect(303, "/auth-ui");
         if (secret != Secret) return res.redirect(303, "/auth-ui");
+
+        res.cookie('session', session, {
+            httpOnly: true,
+            secure: false,
+            sameSite: 'Strict',
+            maxAge: 3600 * 1000,
+        });
 
 
         res.statusMessage = "Fetched audit UI";

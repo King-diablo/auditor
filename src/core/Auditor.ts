@@ -2,7 +2,7 @@ import chalk from "chalk";
 import { auditModel, checkForMongodb } from "../database/mongodb";
 import { auditPrisma, checkForPrisma } from "../database/prisma";
 import { errorLogger, requestLogger } from "../middleware";
-import { UIRouter, checkForFramework, downloadDependency } from "../router";
+import { UIRouter, checkForFramework, deleteDownloadedDependency, downloadDependency } from "../router";
 import { DBInstance, Framework, SupportedLoggersRequest, TAuditOptions, TEvent, TFileConfig, TRemoteConfig } from "../types/type";
 import { createFile, generateAuditContent, generateByte, getFileLocation, handleLog, handleLogRotation } from "../utils";
 import { addTask, beginSchedule, currentTimer } from "../utils/scheduler";
@@ -140,7 +140,7 @@ export class Audit<F extends Framework = "express"> {
                 AppConfig.getAuditOption()?.logger?.info(chalk.yellow("In order to use this module some dependency will be downloaded"));
                 await downloadDependency();
             }
-        }
+        } else await deleteDownloadedDependency();
 
 
 

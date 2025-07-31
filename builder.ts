@@ -7,5 +7,5 @@ rmSync('dist', { recursive: true, force: true });
 // Run tsup
 execSync('tsup', { stdio: 'inherit' });
 
-// Copy UI folder
-cpSync('src/ui', 'dist/ui', { recursive: true });
+// Copy UI folder (this is now deprecated as of version 0.3.1^)
+// cpSync('src/ui', 'dist/ui', { recursive: true }); 

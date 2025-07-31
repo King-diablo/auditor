@@ -1,5 +1,6 @@
 import chalk from "chalk";
-import { createWriteStream, existsSync } from 'fs';
+import { constants, createWriteStream } from "fs";
+import { access, mkdir } from "fs/promises";
 import path from "path";
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
@@ -9,6 +10,8 @@ import { checkForModule } from "../utils";
 import { createExpressRouter } from "./expressRouter";
 import { createFastifyRouter } from "./fastifyRouter";
 import { createKoaRouter } from "./koaRouter";
+import { rm } from "fs/promises";
+
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -53,18 +56,86 @@ export const UIRouter = {
 */
 export const downloadDependency = async () => {
     const logger = AppConfig.getAuditOption()?.logger;
-    await downloadFile('https://cdn.jsdelivr.net/npm/chart.js', 'chart.min.js');
-    await downloadFile('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js', 'html2canvas.min.js');
-    logger?.info((chalk.green("Files downloaded successfully")));
+    const baseUrl = 'https://raw.githubusercontent.com/King-diablo/auditor/refs/heads/master/src/ui';
+    const dependenciesBaseUrl = 'https://cdn.jsdelivr.net/npm';
+    const downloadable = [
+        {
+            url: `${dependenciesBaseUrl}/html2canvas@1.4.1/dist/html2canvas.min.js`,
+            fileName: 'html2canvas.min.js',
+        },
+        {
+            url: `${dependenciesBaseUrl}/chart.js`,
+            fileName: 'chart.min.js',
+        },
+        {
+            url: `${baseUrl}/index.css`,
+            fileName: 'index.css',
+        },
+        {
+            url: `${baseUrl}/index.js`,
+            fileName: 'index.js',
+        },
+        {
+            url: `${baseUrl}/auth.html`,
+            fileName: 'auth.html',
+        },
+        {
+            url: `${baseUrl}/index.html`,
+            fileName: 'index.html',
+        },
+    ];
+
+    const hasUIPath = await hasFileAccess(uiPath);
+
+    if (!hasUIPath) {
+        try {
+            mkdir(uiPath, { recursive: true });
+            logger?.info(chalk.greenBright("ui folder generated successfully"));
+        } catch (error: any) {
+            logger?.error(chalk.redBright("failed to generate folder"));
+            if ("message" in error)
+                logger?.error(chalk.redBright(error.message));
+            else logger?.error(chalk.redBright(error));
+            return;
+        }
+    }
+
+    let didDownload = false;
+
+    for (const { url, fileName } of downloadable) {
+        didDownload = await downloadFile(url, fileName);
+    }
+
+    if (didDownload) {
+        logger?.info((chalk.green("Files downloaded successfully")));
+    }
 };
 
-async function downloadFile(url: string, fileName: string): Promise<void> {
-    const location = path.join(uiPath, fileName);
+export const deleteDownloadedDependency = async () => {
+    const hasUIPath = await hasFileAccess(uiPath);
     const logger = AppConfig.getAuditOption()?.logger;
 
-    if (existsSync(location)) {
+    if (!hasUIPath) return;
+
+    try {
+        await rm(uiPath, { recursive: true });
+        logger?.info(chalk.greenBright("ui content deleted successfully"));
+    } catch (error: any) {
+        logger?.error(chalk.redBright("failed to delete ui content"));
+        if ("message" in error)
+            logger?.error(chalk.redBright(error.message));
+        else logger?.error(chalk.redBright(error));
+    }
+};
+
+async function downloadFile(url: string, fileName: string): Promise<boolean> {
+    const location = path.join(uiPath, fileName);
+    const logger = AppConfig.getAuditOption()?.logger;
+    const hasLocation = await hasFileAccess(location);
+
+    if (hasLocation) {
         logger?.info(chalk.gray(`Skipping ${fileName}, already exists.`));
-        return;
+        return false;
     }
 
     logger?.info(chalk.yellow(`Downloading ${fileName}`));
@@ -73,7 +144,7 @@ async function downloadFile(url: string, fileName: string): Promise<void> {
 
     if (!res.ok || !res.body) {
         logger?.error(chalk.red(`Failed to fetch ${url}: ${res.status}`));
-        return;
+        return false;
     }
 
     const nodeStream = Readable.fromWeb(res.body as any);
@@ -82,7 +153,18 @@ async function downloadFile(url: string, fileName: string): Promise<void> {
     try {
         await pipeline(nodeStream, fileStream);
         logger?.info(chalk.green(`Downloaded ${fileName} successfully.`));
+        return true;
     } catch (err) {
         logger?.error(chalk.red(`Error writing ${fileName}: ${err}`));
+        return false;
     }
 }
+
+const hasFileAccess = async (path: string) => {
+    try {
+        await access(path, constants.F_OK);
+        return true;
+    } catch (error) {
+        return false;
+    }
+};
