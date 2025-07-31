@@ -4,7 +4,8 @@ import { auditPrisma, checkForPrisma } from "../database/prisma";
 import { errorLogger, requestLogger } from "../middleware";
 import { UIRouter, checkForFramework, downloadDependency } from "../router";
 import { DBInstance, Framework, SupportedLoggersRequest, TAuditOptions, TEvent, TFileConfig, TRemoteConfig } from "../types/type";
-import { createFile, generateAuditContent, generateByte, getFileLocation, handleLog } from "../utils";
+import { createFile, generateAuditContent, generateByte, getFileLocation, handleLog, handleLogRotation } from "../utils";
+import { addTask, beginSchedule, currentTimer } from "../utils/scheduler";
 import { userProfile } from "../utils/user";
 import { AppConfig } from "./AppConfigs";
 
@@ -149,6 +150,13 @@ export class Audit<F extends Framework = "express"> {
         this.HandleSystemErrors();
 
         this.auditOptions.logger?.info(chalk.green("Default Audit config set successfully"));
+
+        if (AppConfig.getAuditOption()?.maxRetention ?? 0 > 0) {
+            beginSchedule();
+            addTask(handleLogRotation);
+        }
+
+        await handleLogRotation();
     }
 
 
@@ -320,12 +328,14 @@ export class Audit<F extends Framework = "express"> {
         const folder = config?.folderName ?? "audit";
         const baseFileName = config?.fileName ?? "audit";
         const fileName = baseFileName.endsWith(".log") ? baseFileName : `${baseFileName}.log`;
+        const maxByte = config.maxSizeBytes ?? generateByte();
 
         this.fileConfig = {
             ...config,
             folderName: folder,
             fileName,
             fullPath: "",
+            maxSizeBytes: maxByte,
         };
     }
 
@@ -500,6 +510,7 @@ export class Audit<F extends Framework = "express"> {
                 outcome: "exit",
                 code,
             });
+            if (currentTimer) currentTimer().close();
             handleLog(file, content);
         });
 
