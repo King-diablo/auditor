@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { constants, createWriteStream } from "fs";
-import { access, mkdir } from "fs/promises";
+import { access, mkdir, rm } from "fs/promises";
 import path from "path";
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
@@ -10,7 +10,6 @@ import { checkForModule } from "../utils";
 import { createExpressRouter } from "./expressRouter";
 import { createFastifyRouter } from "./fastifyRouter";
 import { createKoaRouter } from "./koaRouter";
-import { rm } from "fs/promises";
 
 
 
