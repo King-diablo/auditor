@@ -63,6 +63,10 @@ export const downloadDependency = async () => {
             fileName: 'html2canvas.min.js',
         },
         {
+            url: `${baseUrl}/auditor.svg`,
+            fileName: 'auditor.svg',
+        },
+        {
             url: `${dependenciesBaseUrl}/chart.js`,
             fileName: 'chart.min.js',
         },
