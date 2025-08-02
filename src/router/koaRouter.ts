@@ -60,7 +60,7 @@ const koaRouter = async ({ Username = 'admin', Password = 'admin', Secret }: TRo
 
         let decoded: string;
         try {
-            decoded = atob(id);
+            decoded = Buffer.from(id, "base64").toString("utf-8");
         } catch {
             ctx.status = 400;
             ctx.body = { message: "Invalid base64" };
@@ -79,9 +79,10 @@ const koaRouter = async ({ Username = 'admin', Password = 'admin', Secret }: TRo
             return;
         }
 
-        const session = btoa(`${Username}:${Password}:${Secret}`);
+
+        const session = Buffer.from(`${Username}:${Password}:${Secret}`).toString("utf-8");
         ctx.status = 303;
-        ctx.set('Set-Cookie', `session=${session}; Path=/; HttpOnly; SameSite=Strict Max-Age=3600`);
+        ctx.set('Set-Cookie', `session=${session}; Path=/; HttpOnly; SameSite=Strict; Max-Age=3600`);
         ctx.redirect('/audit-ui');
 
     });
@@ -98,7 +99,7 @@ const koaRouter = async ({ Username = 'admin', Password = 'admin', Secret }: TRo
 
         let decoded: string;
         try {
-            decoded = atob(session);
+            decoded = Buffer.from(session, "base64").toString("utf-8");
         } catch {
             return ctx.redirect('/auth-ui');
         }
@@ -122,7 +123,7 @@ const koaRouter = async ({ Username = 'admin', Password = 'admin', Secret }: TRo
 
         let decoded: string;
         try {
-            decoded = atob(session);
+            decoded = Buffer.from(session, "base64").toString("utf-8");
         } catch {
             ctx.status = 403;
             ctx.body = 'Forbidden';

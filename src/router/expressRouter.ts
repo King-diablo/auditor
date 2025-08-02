@@ -50,12 +50,12 @@ const expressRouter = async ({ Username = "admin", Password = "admin", Secret }:
             res.statusMessage = "Missing information";
             return res.status(404).json({ message: "Id is required" });
         }
-
-        const decodedString = atob(incomingCredentials.id);
+        const decodedString = Buffer.from(incomingCredentials.id, "base64").toString("utf-8");
 
         const [username, password] = decodedString.split(':');
 
-        const credentials = btoa(`${Username}:${Password}:${Secret}`);
+
+        const credentials = Buffer.from(`${Username}:${Password}:${Secret}`).toString("base64");
 
         if (username != Username) return res.status(400).json({ message: "incorrect username" });
         if (password != Password) return res.status(400).json({ message: "incorrect password" });
@@ -91,7 +91,8 @@ const expressRouter = async ({ Username = "admin", Password = "admin", Secret }:
             return res.redirect(303, "/auth-ui");
 
         }
-        const decodedString = atob(session);
+
+        const decodedString = Buffer.from(session, "base64").toString("utf-8");
 
         const [username, password, secret] = decodedString.split(':');
 
@@ -127,7 +128,7 @@ const expressRouter = async ({ Username = "admin", Password = "admin", Secret }:
 
         }
 
-        const decodedString = atob(session);
+        const decodedString = Buffer.from(session, "base64").toString("utf-8");
 
         const [username, password, secret] = decodedString.split(':');
 
