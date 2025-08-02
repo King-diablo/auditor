@@ -2,7 +2,7 @@ import chalk from "chalk";
 import path from "path";
 import { AppConfig } from "../core/AppConfigs";
 import { TRouter } from "../types";
-import { getLogs } from "../utils";
+import { decodeSession, encodeSession, getLogs } from "../utils";
 
 let uiPath: string;
 
@@ -50,12 +50,12 @@ const expressRouter = async ({ Username = "admin", Password = "admin", Secret }:
             res.statusMessage = "Missing information";
             return res.status(404).json({ message: "Id is required" });
         }
-        const decodedString = Buffer.from(incomingCredentials.id, "base64").toString("utf-8");
+        const decodedString = decodeSession(incomingCredentials.id);
 
         const [username, password] = decodedString.split(':');
 
 
-        const credentials = Buffer.from(`${Username}:${Password}:${Secret}`).toString("base64");
+        const credentials = encodeSession(`${Username}:${Password}:${Secret}`);
 
         if (username != Username) return res.status(400).json({ message: "incorrect username" });
         if (password != Password) return res.status(400).json({ message: "incorrect password" });
@@ -92,21 +92,13 @@ const expressRouter = async ({ Username = "admin", Password = "admin", Secret }:
 
         }
 
-        const decodedString = Buffer.from(session, "base64").toString("utf-8");
+        const decodedString = decodeSession(session);
 
         const [username, password, secret] = decodedString.split(':');
 
         if (username != Username) return res.redirect(303, "/auth-ui");
         if (password != Password) return res.redirect(303, "/auth-ui");
         if (secret != Secret) return res.redirect(303, "/auth-ui");
-
-        res.cookie('session', session, {
-            httpOnly: true,
-            secure: false,
-            sameSite: 'Strict',
-            maxAge: 3600 * 1000,
-        });
-
 
         res.statusMessage = "Fetched audit UI";
 
@@ -128,7 +120,7 @@ const expressRouter = async ({ Username = "admin", Password = "admin", Secret }:
 
         }
 
-        const decodedString = Buffer.from(session, "base64").toString("utf-8");
+        const decodedString = decodeSession(session);
 
         const [username, password, secret] = decodedString.split(':');
 
