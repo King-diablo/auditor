@@ -3,8 +3,8 @@ import { AppConfig } from '../core/AppConfigs';
 import fs from 'fs';
 import path from "path";
 import { TRouter } from '../types';
-import { getLogs } from '../utils';
-
+import { decodeSession, encodeSession, getLogs } from '../utils';
+import { Context } from "koa";
 
 let uiPath: string;
 
@@ -49,18 +49,19 @@ const koaRouter = async ({ Username = 'admin', Password = 'admin', Secret }: TRo
 
     const router = new Router();
 
-    router.post('/login', async (ctx: any) => {
+    router.post('/login', async (ctx: Context) => {
         const body = await getRequestBody(ctx);
         const id = body?.id;
         if (!id) {
             ctx.status = 400;
             ctx.body = { message: "Id is required" };
+            ctx.message = "Missing information";
             return;
         }
 
         let decoded: string;
         try {
-            decoded = atob(id);
+            decoded = decodeSession(id);
         } catch {
             ctx.status = 400;
             ctx.body = { message: "Invalid base64" };
@@ -79,26 +80,31 @@ const koaRouter = async ({ Username = 'admin', Password = 'admin', Secret }: TRo
             return;
         }
 
-        const session = btoa(`${Username}:${Password}:${Secret}`);
+
+        const session = encodeSession(`${Username}:${Password}:${Secret}`);
         ctx.status = 303;
-        ctx.set('Set-Cookie', `session=${session}; Path=/; HttpOnly; SameSite=Strict Max-Age=3600`);
+        ctx.set('Set-Cookie', `session=${session}; Path=/; HttpOnly; SameSite=Strict; Max-Age=3600`);
+        ctx.message = "Authenticated";
         ctx.redirect('/audit-ui');
 
     });
 
-    router.get('/auth-ui', (ctx: any) => {
+    router.get('/auth-ui', (ctx: Context) => {
         ctx.type = 'html';
+        ctx.message = "Fetched auth UI";
         ctx.body = fs.createReadStream(path.join(uiPath, 'auth.html'));
     });
 
-    router.get('/audit-ui', (ctx: any) => {
-
+    router.get('/audit-ui', (ctx: Context) => {
         const session = getCookie(ctx, 'session');
-        if (!session) return ctx.redirect('/auth-ui');
+        if (!session) {
+            ctx.message = "Unauthorized ui access";
+            return ctx.redirect('/auth-ui');
+        }
 
         let decoded: string;
         try {
-            decoded = atob(session);
+            decoded = decodeSession(session);
         } catch {
             return ctx.redirect('/auth-ui');
         }
@@ -109,20 +115,22 @@ const koaRouter = async ({ Username = 'admin', Password = 'admin', Secret }: TRo
         }
 
         ctx.type = 'html';
+        ctx.message = "Fetched audit UI";
         ctx.body = fs.createReadStream(path.join(uiPath, 'index.html'));
     });
 
-    router.get('/audit-log', (ctx: any) => {
+    router.get('/audit-log', (ctx: Context) => {
         const session = getCookie(ctx, 'session');
         if (!session) {
             ctx.status = 403;
             ctx.body = 'Forbidden';
+            ctx.message = "Unauthorized ui access";
             return;
         }
 
         let decoded: string;
         try {
-            decoded = atob(session);
+            decoded = decodeSession(session);
         } catch {
             ctx.status = 403;
             ctx.body = 'Forbidden';
@@ -136,6 +144,7 @@ const koaRouter = async ({ Username = 'admin', Password = 'admin', Secret }: TRo
             return;
         }
 
+        ctx.message = "Fetched audit logs";
         ctx.body = { logs };
     });
 
