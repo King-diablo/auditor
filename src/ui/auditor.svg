@@ -2,20 +2,20 @@
 <!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
 <svg width="800px" height="800px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
 <defs>
-<style>.cls-1{fill:#4285f4;}.cls-2{fill:#669df6;}.cls-3{fill:#aecbfa;}.cls-4{fill:none;}</style>
+<style>.cls-1,.cls-3{fill:#4285f4;}.cls-2{fill:#669df6;}.cls-2,.cls-3,.cls-4{fill-rule:evenodd;}.cls-4{fill:#aecbfa;}</style>
 </defs>
-<title>Icon_24px_CloudAuditLogs_Color</title>
+<title>Icon_24px_DeployManage_Color</title>
 <g data-name="Product Icons">
-<g data-name="colored-32/cloud-audit-logs">
 <g >
-<path id="Fill-3" class="cls-1" d="M12.77,12.72a1.07,1.07,0,0,1-1.52,0L9.76,11.23l.76-.76L12,11.93l4.2-4.2.81.79Z"/>
-<path id="Fill-10" class="cls-2" d="M16,11.59a.91.91,0,0,0-.81.81,3.21,3.21,0,0,1-2.86,2.76,3.25,3.25,0,0,1-1.84-.36,3.19,3.19,0,0,1,1.2-6,3.07,3.07,0,0,1,1.21.13.9.9,0,0,0,1-.28h0a.91.91,0,0,0-.4-1.45A5,5,0,0,0,7,12.49,5,5,0,0,0,12.48,17,5,5,0,0,0,17,12.63a.91.91,0,0,0-1-1Z"/>
-<path id="Fill-16" class="cls-3" d="M12,18a2,2,0,1,1-2,2,2,2,0,0,1,2-2"/>
-<path id="Fill-16-2" data-name="Fill-16" class="cls-3" d="M12,2a2,2,0,1,1-2,2,2,2,0,0,1,2-2"/>
-<rect id="Rectangle" class="cls-4" width="24" height="24"/>
+<rect class="cls-1" x="10" y="17" width="4" height="4"/>
+<polygon class="cls-2" points="19 10.84 14.66 6.51 13.65 7.52 19 12.85 19 10.84"/>
+<polygon class="cls-3" points="15.67 9.53 13.65 7.52 14.66 6.51 15.67 7.52 15.67 9.53"/>
+<polygon class="cls-4" points="10.94 12.24 9.93 11.23 14.66 6.51 15.67 7.52 10.94 12.24"/>
+<polygon class="cls-2" points="10.94 12.24 8.08 9.39 9.1 8.38 11.95 11.23 10.94 12.24"/>
+<polygon class="cls-3" points="10.08 11.38 8.08 9.39 9.1 8.38 10.08 9.36 10.08 11.38"/>
+<polygon class="cls-4" points="5.44 13.99 10.08 9.36 9.07 8.35 5 12.41 5 13.99 5.44 13.99"/>
+<path class="cls-2" d="M22,4.05a1.24,1.24,0,0,0-1-1H3a1.24,1.24,0,0,0-1,1V17a1.19,1.19,0,0,0,1,1H21a1.19,1.19,0,0,0,1-1V4.05ZM20,16H4V5H20Z"/>
+<path class="cls-2" d="M8,22c0-.69.31-1,1-1h6c.69,0,1,.31,1,1Z"/>
 </g>
-</g>
-<path class="cls-1" d="M18,20a1,1,0,0,1-.71-1.7L20,15.59V8.41L17.31,5.7a1,1,0,0,1,0-1.41,1,1,0,0,1,1.42,0l3,3A1,1,0,0,1,22,8v8a1,1,0,0,1-.29.7l-3,3A1,1,0,0,1,18,20Z"/>
-<path class="cls-2" d="M6,20a1,1,0,0,1-.71-.3l-3-3A1,1,0,0,1,2,16V8a1,1,0,0,1,.29-.71l3-3a1,1,0,0,1,1.42,0,1,1,0,0,1,0,1.41L4,8.41v7.18L6.69,18.3a1,1,0,0,1,0,1.42A1,1,0,0,1,6,20Z"/>
 </g>
 </svg>
