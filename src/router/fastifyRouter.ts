@@ -3,7 +3,7 @@ import { AppConfig } from '../core/AppConfigs';
 import fs from 'fs';
 import path from "path";
 import { TRouter } from '../types';
-import { getLogs } from '../utils';
+import { decodeSession, encodeSession, getLogs } from '../utils';
 import { FastifyReply } from 'fastify/types/reply';
 import { FastifyError, FastifyRequest } from 'fastify';
 
@@ -62,13 +62,13 @@ const fastifyRouter = async ({ Username = "admin", Password = "admin", Secret }:
                 return;
             }
 
-            const decoded = Buffer.from(id, 'base64').toString('utf-8');
+            const decoded = decodeSession(id);
             const [username, password] = decoded.split(':');
 
             if (username !== Username) return reply.code(401).send({ message: "Invalid username" });
             if (password !== Password) return reply.code(401).send({ message: "Invalid password" });
 
-            const session = Buffer.from(`${Username}:${Password}:${Secret}`).toString('base64');
+            const session = encodeSession(`${Username}:${Password}:${Secret}`);
 
             reply.header('Set-Cookie', `session=${session}; HttpOnly; Path=/; SameSite=Strict; Max-Age=3600`);
             reply.redirect(`/audit-ui`);
@@ -79,14 +79,12 @@ const fastifyRouter = async ({ Username = "admin", Password = "admin", Secret }:
             const session = cookies["session"];
             if (!session) return reply.redirect('/auth-ui');
             try {
-                const decoded = Buffer.from(session, 'base64').toString('utf-8');
+                const decoded = decodeSession(session);
                 const [username, password, secret] = decoded.split(':');
 
                 if (username !== Username || password !== Password || secret !== Secret) {
                     return reply.redirect('/auth-ui');
                 }
-
-                reply.header('Set-Cookie', `session=${session}; HttpOnly; Path=/; SameSite=Strict; Max-Age=3600`);
                 reply.type('text/html').sendFile('index.html');
             } catch {
                 return reply.redirect('/auth-ui');
@@ -99,7 +97,7 @@ const fastifyRouter = async ({ Username = "admin", Password = "admin", Secret }:
             if (!session) return reply.code(403).send("Forbidden");
 
             try {
-                const decoded = Buffer.from(session, 'base64').toString('utf-8');
+                const decoded = decodeSession(session);
                 const [username, password, secret] = decoded.split(':');
 
                 if (username !== Username || password !== Password || secret !== Secret) {
