@@ -1,129 +1,188 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Auditor Dashboard</title>
-  <link rel="stylesheet" href="index.css" />
-    <link rel="icon" href="auditor.svg" type="image/x-icon" />
-</head>
-<body>
-  <div class="dashboard-container">
-    <header class="dashboard-header">
-      <div class="header-left">
-        <h1>Auditor Dashboard</h1>
-      </div>
-      <div class="header-controls">
-        <div class="theme-toggle">
-            <input type="checkbox" id="themeToggleCheckbox">
-            <label for="themeToggleCheckbox" class="theme-toggle-label"></label>
-          </div>
-          
-          
-        <div class="time-range">
-          <select id="timeRange">
-            <option value="today">Today</option>
-            <option value="yesterday">Yesterday</option>
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-            <option value="custom">Custom Range</option>
-          </select>
-        </div>
-        <div class="custom-range" id="customRangeContainer" style="display: none;">
-          <input type="date" id="startDate" />
-          <span>to</span>
-          <input type="date" id="endDate" />
-          <button id="applyCustomRange" class="btn">Apply</button>
-        </div>
-        <div class="log-type-filter">
-          <select id="logTypeFilter">
-            <option value="all">All Types</option>
-          </select>
-        </div>
-        
-        <div class="chart-type">
-          <select id="chartType">
-            <option value="bar">Bar Chart</option>
-            <option value="line">Line Chart</option>
-            <option value="pie">Pie Chart</option>
-            <option value="doughnut">Doughnut Chart</option>
-          </select>
-        </div>
-        <div class="color-settings-dropdown">
-            <button id="toggleColorSettings" class="btn">🎨 Colors</button>
-            <div id="colorSettingsPanel" class="dropdown-panel" style="display: none;"></div>
-          </div>
-          
-        <button id="exportChart" class="btn export-btn">Export Chart</button>
-      </div>
-    </header>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Auditor Dashboard</title>
+		<link
+			rel="stylesheet"
+			href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+		/>
+		<link rel="stylesheet" href="index.css" />
+		<link rel="icon" href="auditor.svg" type="image/x-icon" />
+	</head>
+	<body data-theme="dark">
+		<header>
+			<div class="header-container">
+				<div class="logo"><i class="fas fa-chart-line"></i> Auditor Dashboard</div>
+				<div class="tabs">
+					<button class="tab active" data-tab="dashboard">Dashboard</button>
+					<button class="tab" data-tab="settings">Settings</button>
+				</div>
+				<div class="header-actions">
+					<button class="logout-btn" id="logout-btn">
+						<i class="fas fa-sign-out-alt"></i> Logout
+					</button>
+					<button class="theme-toggle" id="theme-toggle">
+						<i class="fas fa-moon"></i>
+					</button>
+				</div>
+			</div>
+		</header>
+		<main>
+			<div id="dashboard-content">
+				<div class="dashboard-header">
+					<h1 class="dashboard-title">Auditor Dashboard</h1>
+					<div class="controls">
+						<div class="search-container">
+							<i class="fas fa-search search-icon"></i>
+							<input
+								type="text"
+								class="search-input"
+								placeholder="Search logs..."
+								id="search-input"
+							/>
+						</div>
+						<select class="type-filter" id="type-filter">
+							<option value="all">All Types</option>
+						</select>
+						<select class="filter-select" id="filter-select">
+							<option value="today">Today</option>
+							<option value="yesterday">Yesterday</option>
+							<option value="this-week">This Week</option>
+							<option value="this-month">This Month</option>
+							<option value="custom">Custom Date</option>
+						</select>
+						<div class="custom-date-container" id="custom-date-container">
+							<input type="date" class="date-picker" id="start-date" />
+							<span>to</span>
+							<input type="date" class="date-picker" id="end-date" />
+						</div>
+					</div>
+				</div>
 
-    <main class="dashboard-content">
-      <section class="chart-section">
-        <div class="chart-container">
-          <canvas id="logChart"></canvas>
-        </div>
-      </section>
+				<!-- Add this carousel section -->
+				<div class="log-types-carousel-container">
+					<div class="log-types-carousel" id="log-types-carousel">
+						<!-- Cards will be dynamically generated here -->
+					</div>
+				</div>
+                
+				<div class="chart-container">
+					<div class="chart-header">
+						<h2 class="chart-title">24-Hour Log Activity</h2>
+						<div class="chart-type-toggle">
+							<button class="chart-type-btn active" data-chart-type="bar">Bar</button>
+							<button class="chart-type-btn" data-chart-type="line">Line</button>
+						</div>
+					</div>
+					<div class="chart-wrapper">
+						<canvas id="response-chart"></canvas>
+					</div>
+				</div>
+				<div class="log-table-container">
+					<table class="log-table" id="log-table">
+						<thead>
+							<tr>
+								<th>ID</th>
+								<th>Type</th>
+								<th>Action</th>
+								<th>Message</th>
+								<th>Timestamp</th>
+								<th>Details</th>
+							</tr>
+						</thead>
+						<tbody id="log-table-body">
+							<!-- Log entries will be dynamically generated here -->
+						</tbody>
+					</table>
+					<div class="pagination" id="pagination">
+						<!-- Pagination controls will be dynamically generated here -->
+					</div>
+				</div>
+			</div>
+			<div class="settings-container" id="settings-container">
+				<h1 class="settings-title">Settings</h1>
 
-      <section class="log-table-section">
-        <div class="table-header">
-          <h2>Log Entries</h2>
-          <div class="table-controls">
-            <div class="search-box">
-              <input type="text" id="searchLogs" placeholder="Search logs..." />
-              <i class="fas fa-search"></i>
-            </div>
-            <div class="entries-per-page">
-              <span>Show</span>
-              <select id="entriesPerPage">
-                <option value="10">10</option>
-                <option value="20">20</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-              </select>
-              <span>entries</span>
-            </div>
-            <div class="pagination-info" id="paginationInfo"></div>
-          </div>
-        </div>
-        <div class="table-container">
-          <table id="logTable">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Type</th>
-                <th>Action</th>
-                <th>Message</th>
-                <th>Timestamp</th>
-                <th>Details</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-        <div class="pagination-controls">
-          <button id="prevPage" class="btn pagination-btn" disabled>Previous</button>
-          <div class="page-numbers" id="pageNumbers"></div>
-          <button id="nextPage" class="btn pagination-btn">Next</button>
-        </div>
-      </section>
-    </main>
-  </div>
+				<div class="settings-section">
+					<h2 class="settings-section-title">Table Settings</h2>
+					<div class="settings-form">
+						<div class="form-group">
+							<label class="form-label" for="items-per-page">Items Per Page</label>
+							<select class="form-select" id="items-per-page">
+								<option value="5">5</option>
+								<option value="10" selected>10</option>
+								<option value="25">25</option>
+								<option value="50">50</option>
+								<option value="100">100</option>
+							</select>
+						</div>
+					</div>
+				</div>
 
-  <div id="logModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-scroll-area">
-            <div class="modal-header">
-                <h2>Log Details</h2>
-                <span class="close-modal">&times;</span>
-            </div>
-            <div class="modal-body" id="modalBody"></div>
-        </div>
-    </div>
-  </div>
+				<div class="settings-section">
+					<h2 class="settings-section-title">Refresh Settings</h2>
+					<div class="settings-form">
+						<div class="form-group">
+							<label class="form-label" for="refresh-interval"
+								>Refresh Interval</label
+							>
+							<select class="form-select" id="refresh-interval">
+								<option value="15">15 seconds</option>
+								<option value="30" selected>30 seconds</option>
+								<option value="45">45 seconds</option>
+								<option value="3600">1 hour</option>
+							</select>
+						</div>
+					</div>
+				</div>
 
-  <script src="index.js"></script>
-  <script src="chart.min.js"></script>
-  <script src="html2canvas.min.js"></script>
-</body>
+				<div class="settings-section">
+					<h2 class="settings-section-title">Notification Settings</h2>
+					<div class="settings-form">
+						<div class="form-group">
+							<div class="checkbox-container">
+								<input
+									type="checkbox"
+									id="show-fetch-notifications"
+									class="checkbox"
+								/>
+								<label for="show-fetch-notifications" class="checkbox-label"
+									>Show fetch notifications</label
+								>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<button class="save-btn" id="save-settings">Save Settings</button>
+			</div>
+		</main>
+		<!-- Log Details Modal -->
+		<div class="modal" id="log-details-modal">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h2 class="modal-title">Log Details</h2>
+					<button class="close-btn" id="close-modal">
+						<i class="fas fa-times"></i>
+					</button>
+				</div>
+				<div class="log-details" id="log-details-content">
+					<!-- Log details will be dynamically generated here -->
+				</div>
+			</div>
+		</div>
+		<div class="loading-indicator" id="loading-indicator">
+			<div class="loading-spinner"></div>
+			<p>Loading logs...</p>
+		</div>
+		<div class="notification" id="notification"></div>
+		<footer>
+			<div class="footer-content">
+				<p>&copy; 2023 Auditor Dashboard. All rights reserved.</p>
+			</div>
+		</footer>
+		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+		<script src="index.js"></script>
+	</body>
 </html>

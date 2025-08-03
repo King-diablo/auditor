@@ -1,582 +1,819 @@
-// Refactored and improved JavaScript for Audit Log Dashboard
-
-const DEFAULT_COLORS = {
-    info: '#2196F3',
-    error: '#F44336',
-    warning: '#FF9800',
-    success: '#4CAF50',
-    signal: '#9C27B0',
-    system: '#607D8B',
-    request: '#FF5722',
-};
-
-let currentColors = { ...DEFAULT_COLORS };
-let logsPerPage = parseInt(localStorage.getItem('logsPerPage'), 10) || 10;
-let currentPage = 1;
-let filteredLogs = [];
-let logData = [];
-let logChart;
-
-const DOM = {
-    themeToggle: document.getElementById('themeToggleCheckbox'),
-    timeRange: document.getElementById('timeRange'),
-    chartType: document.getElementById('chartType'),
-    exportChart: document.getElementById('exportChart'),
-    logTable: document.getElementById('logTable').querySelector('tbody'),
-    search: document.getElementById('searchLogs'),
-    prevPage: document.getElementById('prevPage'),
-    nextPage: document.getElementById('nextPage'),
-    pageNumbers: document.getElementById('pageNumbers'),
-    paginationInfo: document.getElementById('paginationInfo'),
-    closeSidebar: document.getElementById('closeSidebar'),
-    colorControls: document.getElementById('colorSettingsPanel'),
-    modal: document.getElementById('logModal'),
-    modalBody: document.getElementById('modalBody'),
-    closeModal: document.querySelector('.close-modal'),
-    entriesPerPage: document.getElementById('entriesPerPage'),
-    logTypeFilter: document.getElementById('logTypeFilter'),
-    startDate: document.getElementById('startDate'),
-    endDate: document.getElementById('endDate'),
-    applyCustomRange: document.getElementById('applyCustomRange'),
-    customRangeContainer: document.getElementById('customRangeContainer')
-};
-
-function capitalize(str) {
-    return str?.charAt(0).toUpperCase() + str?.slice(1);
-}
-
-
-function generateColor() {
-    const h = Math.floor(Math.random() * 360);
-    return `hsl(${h}, 70%, 60%)`;
-}
-
-function getColor(type) {
-    if (!currentColors[type]) currentColors[type] = generateColor();
-    return currentColors[type];
-}
-
-function shadeColor(color, percent) {
-    const num = parseInt(color.slice(1), 16);
-    const R = (num >> 16) + percent;
-    const G = ((num >> 8) & 0x00FF) + percent;
-    const B = (num & 0x0000FF) + percent;
-    return `#${(1 << 24 | Math.min(255, R) << 16 | Math.min(255, G) << 8 | Math.min(255, B)).toString(16).slice(1)}`;
-}
-
-function formatDate(date, full = false) {
-    const opt = full ? {
-        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
-    } : {
-            year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-    };
-    return new Date(date).toLocaleDateString(undefined, opt);
-}
-
-function toggleTheme() {
-    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-    updateChart();
-}
-
-function initTheme() {
-    const saved = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    document.documentElement.setAttribute('data-theme', saved || (prefersDark ? 'dark' : 'light'));
-    if (!saved) localStorage.setItem('theme', prefersDark ? 'dark' : 'light');
-}
-
-function applyDateFilter() {
-    const now = new Date();
-    const range = DOM.timeRange.value;
-    let start, end;
-
-    switch (range) {
-        case 'today':
-            start = new Date(now.setHours(0, 0, 0, 0));
-            end = new Date();
-            break;
-        case 'yesterday':
-            start = new Date(now.setDate(now.getDate() - 1));
-            start.setHours(0, 0, 0, 0);
-            end = new Date(now.setHours(23, 59, 59, 999));
-            break;
-        case 'week':
-            start = new Date(now);
-            start.setDate(start.getDate() - start.getDay());
-            start.setHours(0, 0, 0, 0);
-            end = new Date();
-            break;
-        case 'month':
-            start = new Date(now.getFullYear(), now.getMonth(), 1);
-            end = new Date();
-            break;
-        case 'custom':
-            const s = new Date(DOM.startDate.value);
-            const e = new Date(DOM.endDate.value);
-            if (!isNaN(s) && !isNaN(e)) {
-                start = s;
-                end = new Date(e.setHours(23, 59, 59, 999));
-            } else return;
-            break;
-        default:
-            filteredLogs = [...logData];
-            return;
-    }
-    filteredLogs = logData.filter(log => new Date(log.timeStamp) >= start && new Date(log.timeStamp) <= end);
-    updateChart();
-    updateTable();
-    updatePagination();
-}
-
-function updateChart() {
-    const ctx = document.getElementById('logChart').getContext('2d');
-    const chartType = DOM.chartType.value;
-
-    // Get theme vars
-    const theme = getComputedStyle(document.documentElement);
-    const textColor = theme.getPropertyValue('--text-color').trim();
-    const borderColor = theme.getPropertyValue('--border-color').trim();
-    const cardBg = theme.getPropertyValue('--card-bg').trim();
-
-    // Clean chart if exists
-    if (logChart) logChart.destroy();
-
-    const types = [...new Set(filteredLogs.map(log => log.type))]; // ✅ Define this before use
-
-    const grouped = {};
-
-    filteredLogs.forEach(log => {
-        const date = new Date(log.timeStamp);
-        const hour = `${date.getHours().toString().padStart(2, '0')}:00`; // "14:00"
-        if (!grouped[hour]) grouped[hour] = {};
-        if (!grouped[hour][log.type]) grouped[hour][log.type] = 0;
-        grouped[hour][log.type]++;
-    });
-
-    const allHours = Array.from({ length: 24 }, (_, h) => `${h.toString().padStart(2, '0')}:00`);
-    const logTypes = [...new Set(filteredLogs.map(log => log.type))];
-
-    // Prepare datasets
-    const datasets = logTypes.map(type => {
-        return {
-            label: capitalize(type),
-            data: allHours.map(hour => grouped[hour]?.[type] || 0),
-            backgroundColor: getColor(type),
-            borderColor: shadeColor(getColor(type), -20),
-            fill: chartType !== 'line',
-            tension: 0.4,
-            borderWidth: 2,
-            pointBackgroundColor: getColor(type),
-            pointBorderColor: borderColor,
-        };
-    });
-
-    const options = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                labels: {
-                    color: textColor,
-                    usePointStyle: true,
-                    boxWidth: 12,
-                    padding: 15
-                }
-            },
-            tooltip: {
-                backgroundColor: cardBg,
-                titleColor: textColor,
-                bodyColor: textColor,
-                borderColor: borderColor,
-                borderWidth: 1
-            }
-        },
-        scales: chartType === 'pie' || chartType === 'doughnut' ? {} : {
-            x: {
-                ticks: { color: textColor },
-                grid: { color: borderColor },
-                title: {
-                    display: true,
-                    text: 'Time',
-                    color: textColor
-                }
-            },
-            y: {
-                beginAtZero: true,
-                ticks: { color: textColor },
-                grid: { color: borderColor },
-                title: {
-                    display: true,
-                    text: 'Log Count',
-                    color: textColor
-                }
-            }
-        }
-    };
-
-    if (chartType === 'pie' || chartType === 'doughnut') {
-        const countByType = {};
-        filteredLogs.forEach(log => {
-            countByType[log.type] = (countByType[log.type] || 0) + 1;
-        });
-
-        const labels = Object.keys(countByType);
-        const data = Object.values(countByType);
-        const colors = labels.map(getColor);
-
-        logChart = new Chart(ctx, {
-            type: chartType,
-            data: {
-                labels: labels.map(capitalize),
-                datasets: [{
-                    data,
-                    backgroundColor: colors,
-                    borderColor: colors.map(c => shadeColor(c, -20)),
-                    borderWidth: 1
-                }]
-            },
-            options
-        });
+// Theme Toggle with localStorage persistence
+const themeToggle = document.getElementById('theme-toggle');
+const body = document.body;
+const themeIcon = themeToggle.querySelector('i');
+// Apply saved theme on page load
+const savedTheme = localStorage.getItem('theme') || 'light';
+body.setAttribute('data-theme', savedTheme);
+updateThemeIcon(savedTheme);
+function updateThemeIcon(theme) {
+    if (theme === 'dark') {
+        themeIcon.classList.remove('fa-sun');
+        themeIcon.classList.add('fa-moon');
     } else {
-        logChart = new Chart(ctx, {
-            type: chartType,
-            data: {
-                labels: allHours,
-                datasets
-            },
-            options
-        });
+        themeIcon.classList.remove('fa-moon');
+        themeIcon.classList.add('fa-sun');
     }
 }
-
-
-function getContrastYIQ(hexcolor) {
-    hexcolor = hexcolor.replace('#', '');
-    const r = parseInt(hexcolor.substr(0, 2), 16);
-    const g = parseInt(hexcolor.substr(2, 2), 16);
-    const b = parseInt(hexcolor.substr(4, 2), 16);
-    const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
-    return yiq >= 128 ? '#000000' : '#ffffff';
-}
-
-
-function updateLogTableColors() {
-    document.querySelectorAll('#logTable .badge').forEach(badge => {
-        const type = badge.textContent.trim().toLowerCase();
-        const bgColor = currentColors[type] || getColor(type);
-        badge.style.backgroundColor = bgColor;
-        badge.style.color = getContrastYIQ(bgColor);
+themeToggle.addEventListener('click', () => {
+    const currentTheme = body.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    body.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme); // Save to localStorage
+    updateThemeIcon(newTheme);
+    updateChart();
+});
+// Tab Navigation
+const tabs = document.querySelectorAll('.tab');
+const dashboardContent = document.getElementById('dashboard-content');
+const settingsContainer = document.getElementById('settings-container');
+tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        if (tab.getAttribute('data-tab') === 'dashboard') {
+            dashboardContent.style.display = 'block';
+            settingsContainer.classList.remove('active');
+        } else if (tab.getAttribute('data-tab') === 'settings') {
+            dashboardContent.style.display = 'none';
+            settingsContainer.classList.add('active');
+        }
     });
-}  
-
-
-function updateColorControls(types) {
-    DOM.colorControls.innerHTML = '';
-    types.forEach(type => {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'color-control';
-        wrapper.innerHTML = `
-            <label for="color-${type}" style="color: var(--text-color); text-transform: capitalize;">
-                ${type}
-            </label>
-            <div class="color-preview" style="background:${getColor(type)}"></div>
-            <input type="color" id="color-${type}" value="${getColor(type)}">
-        `;
-        const colorInput = wrapper.querySelector('input');
-        colorInput.addEventListener('input', e => {
-            currentColors[type] = e.target.value;
-            updateChart();
-            updateTable(); // 👈 Updates the badge colors
-        });
-
-        wrapper.querySelector('input').addEventListener('change', e => {
-            e.stopPropagation(); // ✅ Prevents dropdown from closing or parent actions
-            currentColors[type] = e.target.value;
-            localStorage.setItem('customColors', JSON.stringify(currentColors));
-            updateChart();
-            updateLogTableColors();
-
-        });
-
-        DOM.colorControls.appendChild(wrapper);
-    });
+});
+// Logout Button
+const logoutBtn = document.getElementById('logout-btn');
+logoutBtn.addEventListener('click', async () => {
+    // Remove cookies
+    showNotification('Logging out', 'info');
+    await fetch("/logout");
+    setTimeout(async () => {
+        // Redirect to login page
+        showNotification('You have been logged out successfully', 'success');
+        window.location.href = '/auth-ui'; // Replace with actual login page URL
+    }, 1500);
+});
+// Custom Date Container
+const filterSelect = document.getElementById('filter-select');
+const customDateContainer = document.getElementById('custom-date-container');
+filterSelect.addEventListener('change', () => {
+    if (filterSelect.value === 'custom') {
+        customDateContainer.classList.add('active');
+    } else {
+        customDateContainer.classList.remove('active');
+    }
+    filterLogs();
+});
+// Generate 24-hour labels for the chart
+function generate24HourLabels() {
+    const labels = [];
+    const now = new Date();
+    for (let i = 23; i >= 0; i--) {
+        const hour = new Date(now);
+        hour.setHours(now.getHours() - i);
+        labels.push(hour.getHours() + ':00');
+    }
+    return labels;
 }
+// Generate chart data based on filtered logs
+function generateChartData(logs) {
+    // Initialize with all possible types from sample data
+    const data = {
+        authentication: new Array(24).fill(0),
+        system: new Array(24).fill(0),
+        api: new Array(24).fill(0),
+        database: new Array(24).fill(0),
+        security: new Array(24).fill(0)
+    };
 
+    // Add any new types from the logs that aren't in our initial data
+    logs.forEach(log => {
+        if (!data[log.type]) {
+            data[log.type] = new Array(24).fill(0);
+        }
+    });
 
-function updateTable() {
-    DOM.logTable.innerHTML = '';
-    const start = (currentPage - 1) * logsPerPage;
-    const pageLogs = filteredLogs.slice(start, start + logsPerPage);
-    if (!pageLogs.length) {
-        DOM.logTable.innerHTML = '<tr><td colspan="6" style="text-align:center;">No logs found</td></tr>';
+    // Count logs by hour and type
+    logs.forEach(log => {
+        const timeStamp = new Date(log.timeStamp);
+        const hour = timeStamp.getHours();
+        if (data[log.type]) {
+            data[log.type][hour]++;
+        }
+    });
+
+    return data;
+}
+// Chart Setup
+const ctx = document.getElementById('response-chart');
+let chartType = 'bar';
+let chart;
+function createChart(type, logs) {
+    // Destroy existing chart if it exists
+    if (chart) {
+        chart.destroy();
+        chart = null;
+    }
+
+    // Ensure canvas context is available
+    if (!ctx) {
+        console.error('Canvas context not found');
         return;
     }
-    pageLogs.forEach(log => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-        <td>${log.id}</td>
-        <td><span class="badge" style="background-color: ${getColor(log.type)}; color: #fff;">
-        ${log.type.charAt(0).toUpperCase() + log.type.slice(1)}</span></td>
-        <td>${capitalize(log.action)}</td>
-        <td>${log?.message?.slice(0, 50)}${log?.message?.length > 50 ? '...' : ''}</td>
-        <td>${formatDate(log.timeStamp)}</td>
-        <td><button class="btn view-details" data-id="${log.id}"><i class="fas fa-eye"></i> View</button></td>
-      `;
-        DOM.logTable.appendChild(row);
-    });
-    document.querySelectorAll('.view-details').forEach(btn => btn.addEventListener('click', showDetails));
-    updateLogTableColors();
-}
 
-function updatePagination() {
-    const total = Math.ceil(filteredLogs.length / logsPerPage);
-    const start = (currentPage - 1) * logsPerPage + 1;
-    const end = Math.min(currentPage * logsPerPage, filteredLogs.length);
-    DOM.paginationInfo.textContent = `Showing ${start}-${end} of ${filteredLogs.length}`;
-    DOM.prevPage.disabled = currentPage === 1;
-    DOM.nextPage.disabled = currentPage === total;
-    DOM.pageNumbers.innerHTML = '';
+    const isDarkMode = body.getAttribute('data-theme') === 'dark';
+    const textColor = isDarkMode ? '#f0f0f0' : '#333333';
+    const gridColor = isDarkMode ? '#404040' : '#dddddd';
+    const hourData = generateChartData(logs);
 
-    const maxPages = 7;
-    let pages = [];
-    if (total <= maxPages) {
-        pages = Array.from({ length: total }, (_, i) => i + 1);
+    // Define color palette for different log types
+    const colorPalette = [
+        'rgba(156, 39, 176, 0.6)', // purple
+        'rgba(3, 169, 244, 0.6)',   // blue
+        'rgba(255, 152, 0, 0.6)',   // orange
+        'rgba(76, 175, 80, 0.6)',   // green
+        'rgba(244, 67, 54, 0.6)',   // red
+        'rgba(0, 188, 212, 0.6)',   // cyan
+        'rgba(255, 235, 59, 0.6)',  // yellow
+        'rgba(121, 85, 72, 0.6)',   // brown
+        'rgba(158, 158, 158, 0.6)', // grey
+        'rgba(233, 30, 99, 0.6)'    // pink
+    ];
+
+    // Create datasets dynamically based on available log types
+    const datasets = [];
+    let colorIndex = 0;
+
+    // Get all unique log types
+    const uniqueTypes = [...new Set(logs.map(log => log.type))];
+
+    // If no logs, create a placeholder dataset
+    if (uniqueTypes.length === 0) {
+        datasets.push({
+            label: 'No Data',
+            data: new Array(24).fill(0),
+            backgroundColor: 'rgba(200, 200, 200, 0.2)',
+            borderColor: 'rgba(200, 200, 200, 1)',
+            borderWidth: 1
+        });
     } else {
-        pages = [1];
-        if (currentPage > 3) pages.push('...');
-        const start = Math.max(2, currentPage - 1);
-        const end = Math.min(total - 1, currentPage + 1);
-        for (let i = start; i <= end; i++) pages.push(i);
-        if (currentPage < total - 2) pages.push('...');
-        pages.push(total);
+        // Filter by selected type if not "all"
+        const selectedType = document.getElementById('type-filter').value;
+        const typesToShow = selectedType === 'all' ? uniqueTypes : [selectedType];
+
+        typesToShow.forEach(type => {
+            const color = colorPalette[colorIndex % colorPalette.length];
+            datasets.push({
+                label: type.charAt(0).toUpperCase() + type.slice(1),
+                data: hourData[type] || new Array(24).fill(0),
+                backgroundColor: color,
+                borderColor: color.replace('0.6', '1'),
+                borderWidth: 1
+            });
+            colorIndex++;
+        });
     }
 
-    pages.forEach(p => {
-        const span = document.createElement('span');
-        span.className = `page-number ${p === currentPage ? 'active' : ''}`;
-        span.textContent = p;
-        if (p !== '...') span.addEventListener('click', () => goToPage(p));
-        DOM.pageNumbers.appendChild(span);
-    });
-}
-
-function goToPage(p) {
-    currentPage = p;
-    updateTable();
-    updatePagination();
-}
-
-function showDetails(e) {
-    const id = e.currentTarget.dataset.id;
-    const log = logData.find(l => l.id.toString() === id.toString());
-
-    DOM.modalBody.innerHTML = `
-      <div class="log-details-grid">
-        ${Object.entries(log).map(([key, value]) => `
-          <div class="log-detail-item">
-            <div class="log-detail-key">${formatKey(key)}</div>
-            <div class="log-detail-value">${formatValue(value)}</div>
-          </div>
-        `).join('')}
-      </div>
-    `;
-
-    DOM.modal.style.display = 'block';
-}
-
-function formatKey(key) {
-    // Format camelCase or snake_case keys to Title Case
-    return key
-        .replace(/_/g, ' ')
-        .replace(/([a-z])([A-Z])/g, '$1 $2')
-        .replace(/\b\w/g, l => l.toUpperCase());
-}
-
-function formatValue(value) {
-    if (typeof value === 'object') {
-        return `<pre>${JSON.stringify(value, null, 2)}</pre>`;
-    }
-    return String(value);
-}
-
-
-async function getAuditLogs() {
-    try {
-        const res = await fetch('/audit-log');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        return data.logs;
-    } catch {
-        return [
-            { id: 1, type: 'info', action: 'login', message: 'User logged in', timeStamp: new Date(), details: { userId: 1 } },
-            { id: 2, type: 'error', action: 'api_call', message: 'API failure', timeStamp: new Date(), details: { endpoint: '/api' } },
-        ];
-    }
-}
-
-async function initDashboard() {
-    const stored = localStorage.getItem('customColors');
-
-    let savedColors = {};
-
-    try {
-        savedColors = stored ? JSON.parse(stored) : {};
-    } catch (e) {
-        console.warn('Failed to parse saved colors:', e);
-    }
-
-    currentColors = { ...DEFAULT_COLORS, ...savedColors };
-
-    initTheme();
-    logData = await getAuditLogs();
-    filteredLogs = [...logData];
-
-    const types = [...new Set(logData.map(l => l.type))];
-    populateTypeFilter();
-    updateColorControls(types);
-
-
-    DOM.logTypeFilter.innerHTML = `<option value="all">All Types</option>${types.map(t => `<option value="${t}">${capitalize(t)}</option>`).join('')}`;
-
-    const savedChartType = localStorage.getItem('chartType');
-    if (savedChartType && DOM.chartType.querySelector(`option[value="${savedChartType}"]`)) {
-        DOM.chartType.value = savedChartType;
-    }
-
-
-    updateChart();
-    updateTable();
-    updatePagination();
-
-
-    const toggleBtn = document.getElementById('toggleColorSettings');
-    const panel = document.getElementById('colorSettingsPanel');
-
-    toggleBtn.addEventListener('click', () => {
-        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-    });
-
-
-    DOM.themeToggle.addEventListener('click', toggleTheme);
-    DOM.chartType.addEventListener('change', () => {
-        const type = DOM.chartType.value;
-        localStorage.setItem('chartType', type);
-        updateChart();
-    });
-
-    DOM.prevPage.addEventListener('click', () => goToPage(currentPage - 1));
-    DOM.nextPage.addEventListener('click', () => goToPage(currentPage + 1));
-
-    DOM.search.addEventListener('input', applyFilters);
-    DOM.logTypeFilter.addEventListener('change', applyFilters);
-    DOM.timeRange.addEventListener('change', () => {
-        const showCustom = DOM.timeRange.value === 'custom';
-        document.getElementById('customRangeContainer').style.display = showCustom ? 'flex' : 'none';
-        if (!showCustom) applyFilters();
-    });
-    DOM.applyCustomRange.addEventListener('click', applyFilters);
-
-
-
-    // DOM.logTypeFilter.addEventListener('change', applyFilters);
-    // DOM.search.addEventListener('input', handleSearch);
-    // DOM.timeRange.addEventListener('change', () => {
-    //     const show = DOM.timeRange.value === 'custom';
-    //     DOM.customRangeContainer.style.display = show ? 'flex' : 'none';
-    //     if (!show) applyDateFilter();
-    // });
-    // DOM.applyCustomRange.addEventListener('click', applyDateFilter);
-    DOM.entriesPerPage.value = logsPerPage;
-    DOM.entriesPerPage.addEventListener('change', () => {
-        logsPerPage = +DOM.entriesPerPage.value;
-        localStorage.setItem('logsPerPage', logsPerPage);
-        currentPage = 1;
-        updateTable();
-        updatePagination();
-    });
-    DOM.closeModal.addEventListener('click', () => DOM.modal.style.display = 'none');
-    window.addEventListener('click', e => { if (e.target === DOM.modal) DOM.modal.style.display = 'none'; });
-}
-
-function applyFilters() {
-    const selectedType = DOM.logTypeFilter.value;
-    const selectedRange = DOM.timeRange.value;
-    const searchTerm = DOM.search.value.toLowerCase();
-
-    let filtered = [...logData];
-
-    // Filter by type
-    if (selectedType !== 'all') {
-        filtered = filtered.filter(log => log.type === selectedType);
-    }
-
-    // Filter by time range
-    const now = new Date();
-    const today = new Date(now.setHours(0, 0, 0, 0));
-
-    filtered = filtered.filter(log => {
-        const time = new Date(log.timeStamp);
-        switch (selectedRange) {
-            case 'today':
-                return time >= today;
-            case 'yesterday':
-                const yest = new Date(today);
-                yest.setDate(today.getDate() - 1);
-                return time >= yest && time < today;
-            case 'week':
-                const weekStart = new Date(today);
-                weekStart.setDate(today.getDate() - today.getDay());
-                return time >= weekStart;
-            case 'month':
-                const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-                return time >= monthStart;
-            case 'custom':
-                const start = new Date(DOM.startDate.value);
-                const end = new Date(DOM.endDate.value);
-                return time >= start && time <= end;
-            default:
-                return true;
+    // Calculate max value for y-axis
+    let maxValue = 0;
+    datasets.forEach(dataset => {
+        const datasetMax = Math.max(...dataset.data);
+        if (datasetMax > maxValue) {
+            maxValue = datasetMax;
         }
     });
 
-    // Search filter
-    if (searchTerm) {
-        filtered = filtered.filter(log =>
-            Object.values(log).some(v => v?.toString().toLowerCase().includes(searchTerm)),
-        );
+    // Add padding to max value (at least 1 if max is 0)
+    maxValue = maxValue === 0 ? 1 : Math.ceil(maxValue * 1.1);
+
+    console.log('Creating chart with datasets:', datasets);
+    console.log('Logs data:', logs);
+
+    try {
+        chart = new Chart(ctx, {
+            type: type,
+            data: {
+                labels: generate24HourLabels(),
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: maxValue,
+                        title: {
+                            display: true,
+                            text: 'Log Count',
+                            color: textColor
+                        },
+                        ticks: {
+                            color: textColor,
+                            stepSize: 1 // Ensure integer steps
+                        },
+                        grid: {
+                            color: gridColor
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time (24 Hours)',
+                            color: textColor
+                        },
+                        ticks: {
+                            color: textColor
+                        },
+                        grid: {
+                            color: gridColor
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: textColor
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
+                    }
+                }
+            }
+        });
+        console.log('Chart created successfully');
+    } catch (error) {
+        console.error('Error creating chart:', error);
+    }
+}
+function updateChart() {
+    createChart(chartType, filteredLogs);
+}
+// Chart Type Toggle
+const chartTypeBtns = document.querySelectorAll('.chart-type-btn');
+chartTypeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        chartTypeBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        chartType = btn.getAttribute('data-chart-type');
+        updateChart();
+    });
+});
+// API Configuration
+const API_ENDPOINT = '/audit-log'; // Replace with your actual API endpoint
+// State variables
+let logs = []; // Start with empty data
+let filteredLogs = []; // Initially empty
+let isInitialLoad = true; // Track if this is the initial page load
+// Pagination variables
+let currentPage = 1;
+let itemsPerPage = 10;
+// Refresh interval variables
+let refreshIntervalId = null;
+let refreshInterval = 30; // Default refresh interval in seconds
+// Notification settings
+let showFetchNotifications = true; // Default to show notifications
+// Load settings from localStorage
+function loadSettings() {
+    const savedSettings = localStorage.getItem('dashboardSettings');
+    if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+
+        // Apply items per page setting
+        itemsPerPage = settings.itemsPerPage || 10;
+        document.getElementById('items-per-page').value = itemsPerPage;
+
+        // Apply refresh interval setting
+        refreshInterval = settings.refreshInterval || 30;
+        document.getElementById('refresh-interval').value = refreshInterval;
+
+        // Apply notification setting
+        showFetchNotifications = settings.showFetchNotifications !== undefined ? settings.showFetchNotifications : true;
+        document.getElementById('show-fetch-notifications').checked = showFetchNotifications;
+    }
+}
+// Save settings to localStorage
+function saveSettings() {
+    const settings = {
+        itemsPerPage: parseInt(document.getElementById('items-per-page').value),
+        refreshInterval: parseInt(document.getElementById('refresh-interval').value),
+        showFetchNotifications: document.getElementById('show-fetch-notifications').checked
+    };
+
+    localStorage.setItem('dashboardSettings', JSON.stringify(settings));
+
+    // Apply settings
+    itemsPerPage = settings.itemsPerPage;
+    refreshInterval = settings.refreshInterval;
+    showFetchNotifications = settings.showFetchNotifications;
+
+    // Reset to first page when items per page changes
+    currentPage = 1;
+    renderLogs();
+
+    // Set up the refresh interval
+    setupRefreshInterval();
+
+    showNotification('Settings saved successfully!', 'success');
+}
+
+function generateLogTypeCounts(logs) {
+    const counts = {};
+
+    logs.forEach(log => {
+        if (counts[log.type]) {
+            counts[log.type]++;
+        } else {
+            counts[log.type] = 1;
+        }
+    });
+
+    return counts;
+}
+
+// Render log type cards in the carousel
+function renderLogTypeCards(logs) {
+    const carousel = document.getElementById('log-types-carousel');
+    carousel.innerHTML = '';
+
+    const typeCounts = generateLogTypeCounts(logs);
+
+    // Define color palette for different log types
+    const colorPalette = [
+        'rgba(156, 39, 176, 1)', // purple
+        'rgba(3, 169, 244, 1)',   // blue
+        'rgba(255, 152, 0, 1)',   // orange
+        'rgba(76, 175, 80, 1)',   // green
+        'rgba(244, 67, 54, 1)',   // red
+        'rgba(0, 188, 212, 1)',   // cyan
+        'rgba(255, 235, 59, 1)',  // yellow
+        'rgba(121, 85, 72, 1)',   // brown
+        'rgba(158, 158, 158, 1)', // grey
+        'rgba(233, 30, 99, 1)'    // pink
+    ];
+
+    let colorIndex = 0;
+
+    // Create a card for each log type
+    for (const [type, count] of Object.entries(typeCounts)) {
+        const card = document.createElement('div');
+        card.className = 'log-type-card';
+
+        // Set the card color based on the type
+        const color = colorPalette[colorIndex % colorPalette.length];
+        card.style.borderTop = `4px solid ${color}`;
+
+        card.innerHTML = `
+            <div class="type-name">${type.charAt(0).toUpperCase() + type.slice(1)}</div>
+            <div class="type-count">${count}</div>
+        `;
+
+        // Add click event to filter by this type
+        card.addEventListener('click', () => {
+            document.getElementById('type-filter').value = type;
+            filterLogs();
+        });
+
+        carousel.appendChild(card);
+        colorIndex++;
     }
 
-    filteredLogs = filtered;
-    currentPage = 1;
-    updateChart();
-    updateTable();
-    updatePagination();
-    updateColorControls([...new Set(filteredLogs.map(log => log.type))]);
+    // If no logs, show a message
+    if (Object.keys(typeCounts).length === 0) {
+        const noDataCard = document.createElement('div');
+        noDataCard.className = 'log-type-card';
+        noDataCard.innerHTML = `
+            <div class="type-name">No Logs</div>
+            <div class="type-count">0</div>
+        `;
+        carousel.appendChild(noDataCard);
+    }
 }
 
+// Populate type filter dropdown
+function populateTypeFilter(logs) {
+    const typeFilter = document.getElementById('type-filter');
+    const currentValue = typeFilter.value;
 
-function populateTypeFilter() {
-    const types = [...new Set(logData.map(log => log.type))];
-    DOM.logTypeFilter.innerHTML = `<option value="all">All Types</option>`;
-    types.forEach(type => {
-        const opt = document.createElement('option');
-        opt.value = type;
-        opt.textContent = capitalize(type);
-        DOM.logTypeFilter.appendChild(opt);
+    // Get unique types from logs
+    const uniqueTypes = [...new Set(logs.map(log => log.type))];
+
+    // Clear existing options except the first one (All Types)
+    while (typeFilter.options.length > 1) {
+        typeFilter.remove(1);
+    }
+
+    // Add options for each unique type
+    uniqueTypes.forEach(type => {
+        const option = document.createElement('option');
+        option.value = type;
+        option.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+        typeFilter.appendChild(option);
+    });
+
+    // Try to restore the previous selection if it still exists, otherwise set to 'all'
+    if (currentValue !== 'all' && uniqueTypes.includes(currentValue)) {
+        typeFilter.value = currentValue;
+    } else {
+        typeFilter.value = 'all';
+    }
+}
+// Fetch logs from API
+async function fetchLogsFromAPI() {
+    const loadingIndicator = document.getElementById('loading-indicator');
+    loadingIndicator.classList.add('active');
+
+    try {
+        const response = await fetch(API_ENDPOINT);
+        if (!response.ok) {
+            throw new Error(`API request failed with status ${response.status}`);
+        }
+        const data = await response.json();
+
+        // Show notification if enabled
+        if (showFetchNotifications) {
+            showNotification('Logs fetched successfully', 'success');
+        }
+
+        return data.logs;
+    } catch (error) {
+        console.error('Error fetching logs from API:', error);
+
+        // Show notification if enabled
+        if (showFetchNotifications) {
+            showNotification('Failed to fetch logs', 'error');
+        }
+
+        return null; // Return null to indicate error
+    } finally {
+        loadingIndicator.classList.remove('active');
+    }
+}
+// Show notification
+function showNotification(message, type = 'info') {
+    const notification = document.getElementById('notification');
+    notification.textContent = message;
+    notification.className = `notification ${type}`;
+    notification.style.display = 'block';
+
+    setTimeout(() => {
+        notification.classList.add('fade-out');
+        setTimeout(() => {
+            notification.style.display = 'none';
+            notification.classList.remove('fade-out');
+        }, 500);
+    }, 3000);
+}
+// Load logs (from API)
+// Load logs (from API)
+async function loadLogs() {
+    // Fetch from API
+    const apiLogs = await fetchLogsFromAPI();
+
+    if (apiLogs && apiLogs.length > 0) {
+        // Check if we have existing logs
+        if (logs.length > 0 && !isInitialLoad) {
+            // Find new logs by comparing IDs
+            const existingLogIds = new Set(logs.map(log => log.id));
+            const newLogs = apiLogs.filter(log => !existingLogIds.has(log.id));
+
+            if (newLogs.length > 0) {
+                // Add new logs at the beginning of the array
+                logs = [...newLogs, ...logs];
+
+                // Show notification about new logs
+                if (showFetchNotifications) {
+                    showNotification(`${newLogs.length} new logs added`, 'success');
+                }
+
+                // Reset to first page to show new logs
+                currentPage = 1;
+            } else {
+                // No new logs
+                if (showFetchNotifications) {
+                    showNotification('No new logs found', 'info');
+                }
+            }
+        } else {
+            // Initial load or no existing logs
+            logs = apiLogs;
+
+            // After initial load, set flag to false
+            if (isInitialLoad) {
+                isInitialLoad = false;
+            }
+        }
+    } else {
+        // If API returns empty or error, keep logs as they are
+        if (isInitialLoad) {
+            logs = [];
+            isInitialLoad = false;
+        }
+    }
+
+    // Populate the type filter with the current logs
+    populateTypeFilter(logs);
+
+    // Render log type cards
+    renderLogTypeCards(logs);
+
+    // Apply current filters
+    filterLogs();
+}
+
+// Initialize the application
+async function initializeApp() {
+    // Load settings from localStorage
+    loadSettings();
+
+    // Set default filter to "all" to ensure logs are displayed initially
+    document.getElementById('filter-select').value = 'today';
+
+    // Show loading indicator
+    const loadingIndicator = document.getElementById('loading-indicator');
+    loadingIndicator.classList.add('active');
+
+    // Load initial logs from API
+    await loadLogs();
+
+    // Set up refresh interval
+    setupRefreshInterval();
+
+    filterSelect.dispatchEvent(new Event('change'));
+
+    // Render initial UI
+    renderLogs();
+
+    // Create chart with a small delay to ensure DOM is ready
+    setTimeout(() => {
+        createChart(chartType, filteredLogs);
+    }, 100);
+}
+// Render Log Table with pagination
+function renderLogs() {
+    const logTableBody = document.getElementById('log-table-body');
+    logTableBody.innerHTML = '';
+
+    // If no logs, show a message
+    if (filteredLogs.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td colspan="6" class="no-logs-message">No logs found</td>
+        `;
+        logTableBody.appendChild(row);
+
+        // Render empty pagination
+        renderPagination();
+        return;
+    }
+
+    // Calculate pagination
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
+    paginatedLogs.forEach(log => {
+        const row = document.createElement('tr');
+        const typeClass = `type-${log.type}`;
+        row.innerHTML = `
+            <td>${log.id}</td>
+            <td><span class="log-type ${typeClass}">${log.type.charAt(0).toUpperCase() + log.type.slice(1)}</span></td>
+            <td>${log.action}</td>
+            <td>${log.message}</td>
+            <td>${log.timeStamp}</td>
+            <td>
+                <button class="action-btn" title="View Details" data-log-id="${log.id}">
+                    <i class="fas fa-eye"></i>
+                </button>
+            </td>
+        `;
+        logTableBody.appendChild(row);
+    });
+    // Render pagination controls
+    renderPagination();
+    // Add event listeners to detail buttons
+    document.querySelectorAll('.action-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const logId = this.getAttribute('data-log-id');
+            showLogDetails(logId);
+        });
     });
 }
+// Render pagination controls
+function renderPagination() {
+    const pagination = document.getElementById('pagination');
+    pagination.innerHTML = '';
+    const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
 
+    // If no logs, don't show pagination
+    if (filteredLogs.length === 0) {
+        return;
+    }
 
-function handleSearch() {
-    const term = DOM.search.value.toLowerCase();
-    filteredLogs = logData.filter(log =>
-        Object.values(log).some(v => v?.toString().toLowerCase().includes(term))
-    );
-    currentPage = 1;
-    updateTable();
-    updatePagination();
+    // Previous button
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'pagination-btn';
+    prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
+    prevBtn.disabled = currentPage === 1;
+    prevBtn.addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            renderLogs();
+        }
+    });
+    pagination.appendChild(prevBtn);
+    // Page numbers
+    const maxVisiblePages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+    if (endPage - startPage + 1 < maxVisiblePages) {
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+    }
+    for (let i = startPage; i <= endPage; i++) {
+        const pageBtn = document.createElement('button');
+        pageBtn.className = `pagination-btn ${i === currentPage ? 'active' : ''}`;
+        pageBtn.textContent = i;
+        pageBtn.addEventListener('click', () => {
+            currentPage = i;
+            renderLogs();
+        });
+        pagination.appendChild(pageBtn);
+    }
+    // Next button
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'pagination-btn';
+    nextBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
+    nextBtn.disabled = currentPage === totalPages;
+    nextBtn.addEventListener('click', () => {
+        if (currentPage < totalPages) {
+            currentPage++;
+            renderLogs();
+        }
+    });
+    pagination.appendChild(nextBtn);
+    // Page info
+    const pageInfo = document.createElement('div');
+    pageInfo.className = 'pagination-info';
+    const startItem = (currentPage - 1) * itemsPerPage + 1;
+    const endItem = Math.min(currentPage * itemsPerPage, filteredLogs.length);
+    pageInfo.textContent = `Showing ${startItem}-${endItem} of ${filteredLogs.length} items`;
+    pagination.appendChild(pageInfo);
 }
+// Show log details in modal
+function showLogDetails(logId) {
+    const log = logs.find(l => l.id === logId);
+    if (!log) return;
+    const modal = document.getElementById('log-details-modal');
+    const content = document.getElementById('log-details-content');
 
-document.addEventListener('DOMContentLoaded', initDashboard);
+    // Format details as a list instead of raw JSON
+    let detailsHtml = '<ul class="detail-list">';
+    for (const [key, value] of Object.entries(log.details ?? log)) {
+        detailsHtml += `<li><strong>${key}:</strong> ${value}</li>`;
+    }
+    detailsHtml += '</ul>';
+
+    content.innerHTML = `
+        <div class="detail-row">
+            <div class="detail-label">ID:</div>
+            <div class="detail-value">${log.id}</div>
+        </div>
+        <div class="detail-row">
+            <div class="detail-label">Type:</div>
+            <div class="detail-value">${log.type.charAt(0).toUpperCase() + log.type.slice(1)}</div>
+        </div>
+        <div class="detail-row">
+            <div class="detail-label">Action:</div>
+            <div class="detail-value">${log.action}</div>
+        </div>
+        <div class="detail-row">
+            <div class="detail-label">Message:</div>
+            <div class="detail-value">${log.message}</div>
+        </div>
+        <div class="detail-row">
+            <div class="detail-label">timeStamp:</div>
+            <div class="detail-value">${log.timeStamp}</div>
+        </div>
+        <div class="detail-row">
+            <div class="detail-label">Details:</div>
+            <div class="detail-value">${detailsHtml}</div>
+        </div>
+    `;
+    modal.classList.add('active');
+}
+// Close modal
+const closeModal = document.getElementById('close-modal');
+const modal = document.getElementById('log-details-modal');
+closeModal.addEventListener('click', () => {
+    modal.classList.remove('active');
+});
+modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+        modal.classList.remove('active');
+    }
+});
+// Search functionality
+const searchInput = document.getElementById('search-input');
+searchInput.addEventListener('input', () => {
+    filterLogs();
+});
+// Type filter functionality
+const typeFilter = document.getElementById('type-filter');
+typeFilter.addEventListener('change', () => {
+    filterLogs();
+});
+// Filter functionality
+function filterLogs() {
+    const filterValue = filterSelect.value;
+    let tempFilteredLogs = [...logs]; // Start with all logs
+
+    console.log('Filtering logs with filter value:', filterValue);
+    console.log('Total logs before filtering:', tempFilteredLogs.length);
+
+    // Apply actual date filtering
+    const now = new Date();
+    let startDate, endDate;
+
+    if (filterValue === 'today') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    } else if (filterValue === 'yesterday') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else if (filterValue === 'this-week') {
+        const dayOfWeek = now.getDay();
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek + 7);
+    } else if (filterValue === 'this-month') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    } else if (filterValue === 'custom') {
+        startDate = new Date(document.getElementById('start-date').value);
+        endDate = new Date(document.getElementById('end-date').value);
+        endDate.setDate(endDate.getDate() + 1); // Include end date
+    }
+
+    if (filterValue !== 'all') {
+        tempFilteredLogs = tempFilteredLogs.filter(log => {
+            const logDate = new Date(log.timeStamp);
+            return logDate >= startDate && logDate < endDate;
+        });
+        console.log('Logs after date filtering:', tempFilteredLogs.length);
+    }
+
+    // Apply type filter if set
+    const selectedType = typeFilter.value;
+    if (selectedType !== 'all') {
+        tempFilteredLogs = tempFilteredLogs.filter(log => log.type === selectedType);
+        console.log('Logs after type filtering:', tempFilteredLogs.length);
+    }
+
+    // Apply search filter if set
+    const searchTerm = searchInput.value.toLowerCase();
+    if (searchTerm) {
+        tempFilteredLogs = tempFilteredLogs.filter(log =>
+            log.id.toLowerCase().includes(searchTerm) ||
+            log.message.toLowerCase().includes(searchTerm) ||
+            log.type.toLowerCase().includes(searchTerm) ||
+            log.action.toLowerCase().includes(searchTerm)
+        );
+        console.log('Logs after search filtering:', tempFilteredLogs.length);
+    }
+
+    filteredLogs = tempFilteredLogs;
+    currentPage = 1;
+    renderLogs();
+    updateChart();
+
+
+    // Update log type cards based on filtered logs
+    // renderLogTypeCards(filteredLogs);
+}
+// Set today's date as default for date pickers
+const today = new Date().toISOString().split('T')[0];
+document.getElementById('start-date').value = today;
+document.getElementById('end-date').value = today;
+// Add event listeners to date pickers
+document.getElementById('start-date').addEventListener('change', filterLogs);
+document.getElementById('end-date').addEventListener('change', filterLogs);
+// Settings Save
+const saveSettingsBtn = document.getElementById('save-settings');
+saveSettingsBtn.addEventListener('click', () => {
+    saveSettings();
+});
+// Refresh functionality
+function setupRefreshInterval() {
+    // Clear any existing interval
+    if (refreshIntervalId) {
+        clearInterval(refreshIntervalId);
+    }
+    // Set up new interval if valid
+    if (refreshInterval > 0) {
+        refreshIntervalId = setInterval(async () => {
+            console.log('Refreshing logs from API...');
+            await loadLogs(); // This will fetch from API and update UI
+        }, refreshInterval * 1000);
+    }
+}
+// Initialize the app when DOM is loaded
+document.addEventListener('DOMContentLoaded', initializeApp);
