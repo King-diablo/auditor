@@ -1,114 +1,307 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Authentication Required</title>
+		<title>Auditor Dashboard</title>
+		<link rel="icon" href="auditor.svg" type="image/x-icon" />
 		<link
 			rel="stylesheet"
 			href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
 		/>
-		<link rel="stylesheet" href="index.css" />
-		<link
-			href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600&display=swap"
-			rel="stylesheet"
-		/>
-    <link rel="icon" href="auditor.svg" type="image/x-icon" />
-	</head>
-	<body>
-		<div class="auth-container">
-			<div class="auth-card">
-				<div class="auth-header">
-					<h1><i class="fas fa-lock"></i> Authentication Required</h1>
-					<p>Please enter your credentials to access the audit dashboard</p>
-				</div>
-
-				<form class="auth-form" id="loginForm">
-					<div class="form-group">
-						<label for="username">Username</label>
-						<div class="input-with-icon">
-							<i class="fas fa-user"></i>
-							<input
-								type="text"
-								id="username"
-								name="username"
-								placeholder="Enter your username"
-								required
-							/>
-						</div>
-					</div>
-
-					<div class="form-group">
-						<label for="password">Password</label>
-						<div class="input-with-icon">
-							<i class="fas fa-key"></i>
-							<input
-								type="password"
-								id="password"
-								name="password"
-								placeholder="Enter your password"
-								required
-							/>
-						</div>
-					</div>
-
-					<button type="submit" class="btn btn-primary">
-						<i class="fas fa-sign-in-alt"></i> Login
-					</button>
-
-					<div class="theme-toggle-container">
-						<label class="theme-toggle">
-							<input type="checkbox" id="themeToggle" />
-							<span class="slider round" />
-						</label>
-						<p id="currentThemeText">Current theme</p>
-					</div>
-				</form>
-
-				<div class="auth-footer">
-					<div class="error-message" id="errorMessage"></div>
-				</div>
-			</div>
-		</div>
-
-		<script>
-			// Theme toggle functionality
-			const themeToggle = document.getElementById('themeToggle');
-			const htmlElement = document.documentElement;
-			const currentThemeText = document.getElementById('currentThemeText');
-			// Check for saved theme preference or use preferred color scheme
-			const savedTheme =
-				localStorage.getItem('theme') ||
-				(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-
-			currentThemeText.innerText = `CurrentTheme: ${savedTheme}`;
-
-			if (savedTheme === 'dark') {
-				htmlElement.setAttribute('data-theme', 'dark');
-				themeToggle.checked = true;
+		<style>
+			:root {
+				--bg-primary: #1a1a1a;
+				--bg-secondary: #252525;
+				--bg-tertiary: #2d2d2d;
+				--text-primary: #f0f0f0;
+				--text-secondary: #b0b0b0;
+				--accent: #4a9eff;
+				--accent-hover: #3a8eef;
+				--border: #404040;
+				--success: #4caf50;
+				--warning: #ff9800;
+				--error: #f44336;
+				--shadow: rgba(0, 0, 0, 0.3);
+			}
+			[data-theme='light'] {
+				--bg-primary: #ffffff;
+				--bg-secondary: #f5f5f5;
+				--bg-tertiary: #e0e0e0;
+				--text-primary: #333333;
+				--text-secondary: #666666;
+				--accent: #2196f3;
+				--accent-hover: #0d8bf2;
+				--border: #dddddd;
+				--success: #4caf50;
+				--warning: #ff9800;
+				--error: #f44336;
+				--shadow: rgba(0, 0, 0, 0.1);
+			}
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+				font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+			}
+			body {
+				background-color: var(--bg-primary);
+				color: var(--text-primary);
+				transition: background-color 0.3s, color 0.3s;
+				min-height: 100vh;
+				display: flex;
+				flex-direction: column;
+			}
+			/* Header Styles */
+			header {
+				background-color: var(--bg-secondary);
+				padding: 1rem;
+				box-shadow: 0 2px 10px var(--shadow);
+				position: sticky;
+				top: 0;
+				z-index: 100;
+			}
+			.header-container {
+				max-width: 1400px;
+				margin: 0 auto;
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+			}
+			.logo {
+				font-size: 1.5rem;
+				font-weight: bold;
+				color: var(--accent);
+			}
+			.header-actions {
+				display: flex;
+				gap: 0.5rem;
+			}
+			.theme-toggle {
+				background-color: var(--bg-tertiary);
+				border: none;
+				color: var(--text-primary);
+				padding: 0.5rem;
+				border-radius: 4px;
+				cursor: pointer;
+				height: 40px;
+				width: 40px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				transition: all 0.3s;
+			}
+			.theme-toggle:hover {
+				background-color: var(--accent);
+			}
+			/* Main Content */
+			main {
+				flex: 1;
+				max-width: 500px;
+				width: 100%;
+				margin: 3rem auto;
+				padding: 0 1rem;
+			}
+			.login-container {
+				background-color: var(--bg-secondary);
+				border-radius: 8px;
+				padding: 2rem;
+				box-shadow: 0 4px 12px var(--shadow);
+			}
+			.login-header {
+				text-align: center;
+				margin-bottom: 2rem;
+			}
+			.login-title {
+				font-size: 1.8rem;
+				font-weight: 600;
+				margin-bottom: 0.5rem;
+			}
+			.login-subtitle {
+				color: var(--text-secondary);
+			}
+			.login-form {
+				display: flex;
+				flex-direction: column;
+				gap: 1.5rem;
+			}
+			.form-group {
+				display: flex;
+				flex-direction: column;
+				gap: 0.5rem;
+			}
+			.form-label {
+				font-weight: 500;
+			}
+			.form-input {
+				background-color: var(--bg-tertiary);
+				border: 1px solid var(--border);
+				color: var(--text-primary);
+				padding: 0.75rem;
+				border-radius: 4px;
+				transition: all 0.3s;
+				font-size: 1rem;
+			}
+			.form-input:focus {
+				outline: none;
+				border-color: var(--accent);
+				box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.2);
+			}
+			.login-btn {
+				background-color: var(--accent);
+				color: white;
+				border: none;
+				padding: 0.75rem;
+				border-radius: 4px;
+				cursor: pointer;
+				font-weight: 600;
+				font-size: 1rem;
+				transition: all 0.3s;
+			}
+			.login-btn:hover {
+				background-color: var(--accent-hover);
+			}
+			.error-message {
+				color: var(--error);
+				font-size: 0.9rem;
+				margin-top: 0.5rem;
+				display: none;
+				text-align: center;
+				padding: 0.5rem;
+				border-radius: 4px;
+				background-color: rgba(244, 67, 54, 0.1);
+				border: 1px solid rgba(244, 67, 54, 0.3);
 			}
 
-			themeToggle.addEventListener('change', () => {
-				const newTheme = themeToggle.checked ? 'dark' : 'light';
-				htmlElement.setAttribute('data-theme', newTheme);
+			.error-message.show {
+				display: block;
+				animation: fadeIn 0.3s ease-in-out;
+			}
+
+			@keyframes fadeIn {
+				from {
+					opacity: 0;
+					transform: translateY(-10px);
+				}
+				to {
+					opacity: 1;
+					transform: translateY(0);
+				}
+			}
+			/* Footer */
+			footer {
+				background-color: var(--bg-secondary);
+				padding: 1.5rem;
+				text-align: center;
+				color: var(--text-secondary);
+				border-top: 1px solid var(--border);
+			}
+			.footer-content {
+				max-width: 1400px;
+				margin: 0 auto;
+			}
+			/* Responsive Design */
+			@media (max-width: 768px) {
+				.login-container {
+					padding: 1.5rem;
+				}
+			}
+		</style>
+	</head>
+	<body data-theme="dark">
+		<header>
+			<div class="header-container">
+				<div class="logo"><i class="fas fa-chart-line"></i> Auditor Dashboard</div>
+				<div class="header-actions">
+					<button class="theme-toggle" id="theme-toggle">
+						<i class="fas fa-moon"></i>
+					</button>
+				</div>
+			</div>
+		</header>
+		<main>
+			<div class="login-container">
+				<div class="login-header">
+					<h1 class="login-title">Welcome Back</h1>
+					<p class="login-subtitle">Sign in to access your dashboard</p>
+				</div>
+				<form class="login-form" id="login-form">
+					<div class="form-group">
+						<label class="form-label" for="username">Username</label>
+						<input
+							type="text"
+							class="form-input"
+							id="username"
+							placeholder="Enter your username"
+							autocomplete="username"
+							required
+						/>
+					</div>
+					<div class="form-group">
+						<label class="form-label" for="password">Password</label>
+						<input
+							type="password"
+							class="form-input"
+							id="password"
+							placeholder="Enter your password"
+							autocomplete="current-password"
+							required
+						/>
+						<div class="error-message" id="error-message">
+							Invalid username or password
+						</div>
+					</div>
+					<button type="submit" class="login-btn">Sign In</button>
+				</form>
+			</div>
+		</main>
+		<footer>
+			<div class="footer-content">
+				<p>&copy; 2023 Auditor Dashboard. All rights reserved.</p>
+			</div>
+		</footer>
+		<script>
+			// Theme Toggle
+			const themeToggle = document.getElementById('theme-toggle');
+			const body = document.body;
+			const themeIcon = themeToggle.querySelector('i');
+
+			// Check for saved theme preference or default to dark
+			const savedTheme = localStorage.getItem('theme') || 'dark';
+			body.setAttribute('data-theme', savedTheme);
+			updateThemeIcon(savedTheme);
+
+			themeToggle.addEventListener('click', () => {
+				const currentTheme = body.getAttribute('data-theme');
+				const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+				body.setAttribute('data-theme', newTheme);
 				localStorage.setItem('theme', newTheme);
-				currentThemeText.innerText = `CurrentTheme: ${newTheme}`;
+				updateThemeIcon(newTheme);
 			});
 
-			// Form submission
-			document.getElementById('loginForm').addEventListener('submit', async (e) => {
+			function updateThemeIcon(theme) {
+				if (theme === 'dark') {
+					themeIcon.classList.remove('fa-sun');
+					themeIcon.classList.add('fa-moon');
+				} else {
+					themeIcon.classList.remove('fa-moon');
+					themeIcon.classList.add('fa-sun');
+				}
+			}
+
+			// Login Form
+			const loginForm = document.getElementById('login-form');
+			const errorMessage = document.getElementById('error-message');
+
+			loginForm.addEventListener('submit', async (e) => {
 				e.preventDefault();
-				const errorElement = document.getElementById('errorMessage');
-				errorElement.textContent = '';
 
-				const formData = new FormData(e.target);
-				const data = {
-					username: formData.get('username'),
-					password: formData.get('password'),
-				};
+				errorMessage.classList.remove('show');
 
-				// Create base64 encoded credentials
-				const credentials = btoa(`${data.username}:${data.password}`);
+				const username = document.getElementById('username').value;
+				const password = document.getElementById('password').value;
+				const credentials = btoa(`${username}:${password}`);
+
 				try {
 					const response = await fetch('/login', {
 						method: 'POST',
@@ -122,15 +315,15 @@
 
 					if (response.redirected) {
 						window.location.href = response.url;
-						// window.location.href = '/audit-ui';
-
 						window.history.replaceState({}, '', '/audit-ui');
 					} else {
 						const result = await response.json();
-						errorElement.textContent = result.message || 'Invalid username or password';
+						errorMessage.textContent = result.message || 'Invalid username or password';
+						errorMessage.classList.add('show');
 					}
 				} catch (err) {
-					errorElement.textContent = err?.message ?? 'Network error. Please try again.';
+					errorMessage.textContent = err?.message ?? 'Network error. Please try again.';
+					errorMessage.classList.add('show');
 				}
 			});
 		</script>

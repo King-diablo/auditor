@@ -68,7 +68,7 @@ export const downloadDependency = async () => {
         },
         {
             url: `${dependenciesBaseUrl}/chart.js`,
-            fileName: 'chart.min.js',
+            fileName: 'chart.js',
         },
         {
             url: `${baseUrl}/index.css`,
