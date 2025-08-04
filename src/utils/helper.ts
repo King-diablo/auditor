@@ -292,6 +292,6 @@ export const getLogs = async () => {
     return item.sort((a, b) => b.timeStamp.localeCompare(a.timeStamp));
 };
 
-export const decodeSession = (content: any | string) => Buffer.from(content, "base64").toString("utf-8");
+export const decodeSession = (content: string) => Buffer.from(content, "base64").toString("utf-8");
 
-export const encodeSession = (content: any | string) => Buffer.from(content).toString("base64");
+export const encodeSession = (content: string) => Buffer.from(content).toString("base64");

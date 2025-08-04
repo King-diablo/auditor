@@ -1,11 +1,9 @@
 import chalk from 'chalk';
+import { FastifyRequest } from 'fastify';
+import { FastifyReply } from 'fastify/types/reply';
 import { AppConfig } from '../core/AppConfigs';
-import fs from 'fs';
-import path from "path";
 import { TRouter } from '../types';
 import { decodeSession, encodeSession, getLogs } from '../utils';
-import { FastifyReply } from 'fastify/types/reply';
-import { FastifyError, FastifyRequest } from 'fastify';
 
 let uiPath: string;
 
@@ -54,6 +52,19 @@ const fastifyRouter = async ({ Username = "admin", Password = "admin", Secret }:
             reply.type('text/html').status(200).sendFile('auth.html');
         });
 
+        fastify.get('/logout', (request: FastifyRequest, reply: FastifyReply) => {
+            const hasSession = validateSession(request, { Username, Password, Secret });
+            if (!hasSession) {
+                return reply.code(403).send("Unauthorized");
+            }
+            reply.header(
+                'Set-Cookie',
+                `session=; HttpOnly; Path=/; SameSite=Strict; Max-Age=0`,
+            );
+
+            reply.type('text/html').status(200).sendFile('auth.html');
+        });
+
         fastify.post('/login', async (request: FastifyRequest<{ Body: { id: string; }; }>, reply: FastifyReply) => {
             const { id } = request.body || {};
 
@@ -75,14 +86,9 @@ const fastifyRouter = async ({ Username = "admin", Password = "admin", Secret }:
         });
 
         fastify.get('/audit-ui', (request: FastifyRequest, reply: FastifyReply) => {
-            const cookies = parseCookies(request.headers.cookie || "");
-            const session = cookies["session"];
-            if (!session) return reply.redirect('/auth-ui');
             try {
-                const decoded = decodeSession(session);
-                const [username, password, secret] = decoded.split(':');
-
-                if (username !== Username || password !== Password || secret !== Secret) {
+                const hasSession = validateSession(request, { Username, Password, Secret });
+                if (!hasSession) {
                     return reply.redirect('/auth-ui');
                 }
                 reply.type('text/html').sendFile('index.html');
@@ -92,18 +98,11 @@ const fastifyRouter = async ({ Username = "admin", Password = "admin", Secret }:
         });
 
         fastify.get('/audit-log', async (request: FastifyRequest, reply: FastifyReply) => {
-            const cookies = parseCookies(request.headers.cookie || "");
-            const session = cookies["session"];
-            if (!session) return reply.code(403).send("Forbidden");
-
             try {
-                const decoded = decodeSession(session);
-                const [username, password, secret] = decoded.split(':');
-
-                if (username !== Username || password !== Password || secret !== Secret) {
+                const hasSession = validateSession(request, { Username, Password, Secret });
+                if (!hasSession) {
                     return reply.code(403).send("Forbidden");
                 }
-
                 const logs = await getLogs();
                 reply.send({ logs });
             } catch {
@@ -113,7 +112,16 @@ const fastifyRouter = async ({ Username = "admin", Password = "admin", Secret }:
     };
 };
 
+const validateSession = (request: FastifyRequest, info: any) => {
+    const cookies = parseCookies(request.headers.cookie || "");
+    const session = cookies["session"];
+    if (!session) return false;
 
+    const decoded = decodeSession(session);
+    const [username, password, secret] = decoded.split(':');
+
+    return !(username !== info.Username || password !== info.Password || secret !== info.Secret);
+};
 
 /**
 * Parses a cookie header string into an object of key-value pairs.

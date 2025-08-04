@@ -2,6 +2,9 @@
 const themeToggle = document.getElementById('theme-toggle');
 const body = document.body;
 const themeIcon = themeToggle.querySelector('i');
+const currentYear = new Date().getFullYear();
+const footer_data = document.getElementById('footer_data').innerHTML = `<p>&copy; ${currentYear} Auditor Dashboard. All rights reserved.;</p>`;
+
 // Apply saved theme on page load
 const savedTheme = localStorage.getItem('theme') || 'light';
 body.setAttribute('data-theme', savedTheme);
@@ -40,6 +43,36 @@ tabs.forEach(tab => {
         }
     });
 });
+
+// Date Formatter
+function formatDateTime(isoString) {
+    if (!isoString) return 'N/A';
+
+    try {
+        const date = new Date(isoString);
+
+        // Format date: Month Day, Year
+        const month = date.toLocaleString('default', { month: 'long' });
+        const day = date.getUTCDate();
+        const year = date.getUTCFullYear();
+
+        // Format time: HH:MM:SS with AM/PM
+        let hours = date.getUTCHours();
+        const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+        const seconds = date.getUTCSeconds().toString().padStart(2, '0');
+        const meridian = hours >= 12 ? 'PM' : 'AM';
+
+        // Convert to 12-hour format
+        hours = hours % 12;
+        hours = hours ? hours : 12; // 0 should be 12
+
+        return `${month} ${day}, ${year}, ${hours}:${minutes}:${seconds} ${meridian}`;
+    } catch (error) {
+        console.error('Error formatting date:', error);
+        return isoString; // Return original string if formatting fails
+    }
+}
+
 // Logout Button
 const logoutBtn = document.getElementById('logout-btn');
 logoutBtn.addEventListener('click', async () => {
@@ -66,11 +99,8 @@ filterSelect.addEventListener('change', () => {
 // Generate 24-hour labels for the chart
 function generate24HourLabels() {
     const labels = [];
-    const now = new Date();
-    for (let i = 23; i >= 0; i--) {
-        const hour = new Date(now);
-        hour.setHours(now.getHours() - i);
-        labels.push(hour.getHours() + ':00');
+    for (let i = 0; i < 24; i += 1) {
+        labels.push(`${i.toString().padStart(2, '0')}:00`);
     }
     return labels;
 }
@@ -82,7 +112,7 @@ function generateChartData(logs) {
         system: new Array(24).fill(0),
         api: new Array(24).fill(0),
         database: new Array(24).fill(0),
-        security: new Array(24).fill(0)
+        security: new Array(24).fill(0),
     };
 
     // Add any new types from the logs that aren't in our initial data
@@ -95,7 +125,7 @@ function generateChartData(logs) {
     // Count logs by hour and type
     logs.forEach(log => {
         const timeStamp = new Date(log.timeStamp);
-        const hour = timeStamp.getHours();
+        const hour = timeStamp.getUTCHours();
         if (data[log.type]) {
             data[log.type][hour]++;
         }
@@ -568,6 +598,7 @@ function renderLogs() {
         return;
     }
 
+
     // Calculate pagination
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
@@ -580,7 +611,7 @@ function renderLogs() {
             <td><span class="log-type ${typeClass}">${log.type.charAt(0).toUpperCase() + log.type.slice(1)}</span></td>
             <td>${log.action}</td>
             <td>${log.message}</td>
-            <td>${log.timeStamp}</td>
+            <td>${formatDateTime(log.timeStamp)}</td>
             <td>
                 <button class="action-btn" title="View Details" data-log-id="${log.id}">
                     <i class="fas fa-eye"></i>
@@ -692,7 +723,7 @@ function showLogDetails(logId) {
         </div>
         <div class="detail-row">
             <div class="detail-label">timeStamp:</div>
-            <div class="detail-value">${log.timeStamp}</div>
+            <div class="detail-value">${formatDateTime(log.timeStamp)}</div>
         </div>
         <div class="detail-row">
             <div class="detail-label">Details:</div>

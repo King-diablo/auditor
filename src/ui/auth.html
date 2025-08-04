@@ -257,12 +257,14 @@
 		</main>
 		<footer>
 			<div class="footer-content">
-				<p>&copy; 2023 Auditor Dashboard. All rights reserved.</p>
+				<p id="footer_data"></p>
 			</div>
 		</footer>
 		<script>
 			// Theme Toggle
+			const currentYear = new Date().getFullYear();
 			const themeToggle = document.getElementById('theme-toggle');
+			const footer_data = document.getElementById('footer_data').innerHTML = `<p>&copy; ${currentYear} Auditor Dashboard. All rights reserved.;</p>`;
 			const body = document.body;
 			const themeIcon = themeToggle.querySelector('i');
 
