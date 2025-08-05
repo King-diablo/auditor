@@ -3,6 +3,7 @@ import path from "path";
 import { AppConfig } from "../core/AppConfigs";
 import { TRouter } from "../types";
 import { decodeSession, encodeSession, getLogs } from "../utils";
+import { Request, Response } from "express";
 
 let uiPath: string;
 
@@ -26,7 +27,6 @@ export const createExpressRouter = (path: string) => {
 */
 const expressRouter = async ({ Username = "admin", Password = "admin", Secret }: TRouter) => {
     let express;
-    const logs = await getLogs();
     try {
         express = await import("express");
         if (!Secret) {
@@ -43,12 +43,33 @@ const expressRouter = async ({ Username = "admin", Password = "admin", Secret }:
     router.use(express.json());
     router.use(express.static(uiPath));
 
-    router.post('/login', (req: any, res: any) => {
+    router.get('/logout', (req: Request, res: Response) => {
+        const session = getSession(req);
+        const isValidated = validateSession(session, { Username, Password, Secret });
+
+        if (!isValidated) {
+            res.statusMessage = "Unauthorized logout access";
+            res.status(400).json({ message: "Unauthorized" });
+            return;
+        }
+
+        res.clearCookie("session", {
+            httpOnly: true,
+            secure: false,
+            sameSite: 'strict',
+            maxAge: 3600 * 1000,
+        });
+        res.statusMessage = "Logged out of dashboard";
+        res.redirect(303, "/auth-ui");
+    });
+
+    router.post('/login', (req: Request, res: Response) => {
         const incomingCredentials = req.body;
 
         if (!incomingCredentials?.id) {
             res.statusMessage = "Missing information";
-            return res.status(404).json({ message: "Id is required" });
+            res.status(404).json({ message: "Id is required" });
+            return;
         }
         const decodedString = decodeSession(incomingCredentials.id);
 
@@ -57,81 +78,86 @@ const expressRouter = async ({ Username = "admin", Password = "admin", Secret }:
 
         const credentials = encodeSession(`${Username}:${Password}:${Secret}`);
 
-        if (username != Username) return res.status(400).json({ message: "incorrect username" });
-        if (password != Password) return res.status(400).json({ message: "incorrect password" });
+        if (username != Username) {
+            res.statusMessage = "Un-Authenticated";
+            res.status(400).json({ message: "incorrect username" });
+            return;
+        }
+        if (password != Password) {
+            res.statusMessage = "Un-Authenticated";
+            res.status(400).json({ message: "incorrect password" });
+            return;
+        }
 
         res.statusMessage = "Authenticated";
 
         res.cookie('session', credentials, {
             httpOnly: true,
             secure: false,         
-            sameSite: 'Strict',
+            sameSite: 'strict',
             maxAge: 3600 * 1000,
         });
 
-        return res.redirect(303, `/audit-ui`);
+        res.redirect(303, `/audit-ui`);
     });
 
-    router.get('/auth-ui', (req, res) => {
+    router.get('/auth-ui', (req: Request, res: Response) => {
         res.statusMessage = "Fetched auth UI";
         res.sendFile(path.join(uiPath, "auth.html"));
     });
 
-    router.get('/audit-ui', (req: any, res: any) => {
+    router.get('/audit-ui', (req: Request, res: Response) => {
+        const session = getSession(req);
+        const isValidated = validateSession(session, { Username, Password, Secret });
 
-        let session = null;
-
-        req.headers.cookie?.split(';').forEach((cookie: any) => {
-            const [name, value] = cookie.trim().split('=');
-            if (name === "session") session = value;
-        });
-
-        if (!session) {
+        if (!isValidated) {
             res.statusMessage = "Unauthorized ui access";
-            return res.redirect(303, "/auth-ui");
-
+            res.redirect(303, "/auth-ui");
+            return;
         }
-
-        const decodedString = decodeSession(session);
-
-        const [username, password, secret] = decodedString.split(':');
-
-        if (username != Username) return res.redirect(303, "/auth-ui");
-        if (password != Password) return res.redirect(303, "/auth-ui");
-        if (secret != Secret) return res.redirect(303, "/auth-ui");
 
         res.statusMessage = "Fetched audit UI";
 
         res.sendFile(path.join(uiPath, "index.html"));
     });
 
-    router.get('/audit-log', (req: any, res: any) => {
+    router.get('/audit-log', async (req: Request, res: Response) => {
 
-        let session = null;
+        const session = getSession(req);
+        const isValidated = validateSession(session, { Username, Password, Secret });
 
-        req.headers.cookie?.split(';').forEach((cookie: any) => {
-            const [name, value] = cookie.trim().split('=');
-            if (name === "session") session = value;
-        });
-
-        if (!session) {
+        if (!isValidated) {
             res.statusMessage = "Unauthorized log access";
-            return res.status(403).send('Forbidden');
-
+            res.status(403).send('Forbidden');
+            return;
         }
 
-        const decodedString = decodeSession(session);
-
-        const [username, password, secret] = decodedString.split(':');
-
-        if (username != Username) return res.status(403).send('Forbidden');
-        if (password != Password) return res.status(403).send('Forbidden');
-        if (secret != Secret) return res.status(403).send('Forbidden');
-
-
+        const logs = await getLogs();
         res.statusMessage = "Fetched audit logs";
         res.status(200).json({ logs });
     });
 
     return router;
+};
+
+const getSession = (req: Request) => {
+    let data = null;
+    req.headers.cookie?.split(';').forEach((cookie: any) => {
+        const [name, value] = cookie.trim().split('=');
+        if (name === "session") data = value;
+    });
+
+    return data;
+};
+const validateSession = (session: string | null, info: any) => {
+
+    if (!session) {
+        return false;
+    }
+
+    const decodedString = decodeSession(session);
+
+    const [username, password, secret] = decodedString.split(':');
+
+    return !(username != info.Username || password !== info.Password || secret !== info.Secret);
 };

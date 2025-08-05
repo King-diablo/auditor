@@ -29,8 +29,6 @@ export const createKoaRouter = (path: string) => {
 */
 const koaRouter = async ({ Username = 'admin', Password = 'admin', Secret }: TRouter) => {
     let Router, serve, compose;
-    const logs = await getLogs();
-
     try {
         Router = (await import('@koa/router')).default;
         serve = (await import('koa-static')).default;
@@ -48,6 +46,25 @@ const koaRouter = async ({ Username = 'admin', Password = 'admin', Secret }: TRo
     }
 
     const router = new Router();
+
+    router.get('/logout', async (ctx: Context) => {
+        const hasSession = validateSession(ctx, { Username, Password, Secret });
+
+        if (!hasSession) {
+            ctx.status = 403;
+            ctx.body = 'Unauthorized';
+            ctx.message = "Unauthorized logout access";
+            return;
+        }
+
+        ctx.message = "Logged out of dashboard";
+        ctx.cookies.set('session', null, {
+            httpOnly: true,
+            sameSite: 'strict',
+            expires: new Date(Date.now() + 60 * 60 * 1000),
+        });
+        ctx.redirect('/audit-ui');
+    });
 
     router.post('/login', async (ctx: Context) => {
         const body = await getRequestBody(ctx);
@@ -83,7 +100,12 @@ const koaRouter = async ({ Username = 'admin', Password = 'admin', Secret }: TRo
 
         const session = encodeSession(`${Username}:${Password}:${Secret}`);
         ctx.status = 303;
-        ctx.set('Set-Cookie', `session=${session}; Path=/; HttpOnly; SameSite=Strict; Max-Age=3600`);
+        ctx.cookies.set('session', session, {
+            httpOnly: true,
+            sameSite: 'strict',
+            expires: new Date(Date.now() + 60 * 60 * 1000),
+        });
+
         ctx.message = "Authenticated";
         ctx.redirect('/audit-ui');
 
@@ -96,22 +118,14 @@ const koaRouter = async ({ Username = 'admin', Password = 'admin', Secret }: TRo
     });
 
     router.get('/audit-ui', (ctx: Context) => {
-        const session = getCookie(ctx, 'session');
-        if (!session) {
+        const hasSession = validateSession(ctx, { Username, Password, Secret });
+
+        if (!hasSession) {
+            ctx.status = 403;
+            ctx.body = 'Forbidden';
             ctx.message = "Unauthorized ui access";
-            return ctx.redirect('/auth-ui');
-        }
-
-        let decoded: string;
-        try {
-            decoded = decodeSession(session);
-        } catch {
-            return ctx.redirect('/auth-ui');
-        }
-
-        const [user, pass, secret] = decoded.split(':');
-        if (user !== Username || pass !== Password || secret !== Secret) {
-            return ctx.redirect('/auth-ui');
+            ctx.redirect('/auth-ui');
+            return;
         }
 
         ctx.type = 'html';
@@ -119,31 +133,16 @@ const koaRouter = async ({ Username = 'admin', Password = 'admin', Secret }: TRo
         ctx.body = fs.createReadStream(path.join(uiPath, 'index.html'));
     });
 
-    router.get('/audit-log', (ctx: Context) => {
-        const session = getCookie(ctx, 'session');
-        if (!session) {
+    router.get('/audit-log', async (ctx: Context) => {
+        const hasSession = validateSession(ctx, { Username, Password, Secret });
+
+        if (!hasSession) {
             ctx.status = 403;
             ctx.body = 'Forbidden';
-            ctx.message = "Unauthorized ui access";
+            ctx.message = "Unauthorized log access";
             return;
         }
-
-        let decoded: string;
-        try {
-            decoded = decodeSession(session);
-        } catch {
-            ctx.status = 403;
-            ctx.body = 'Forbidden';
-            return;
-        }
-
-        const [user, pass, secret] = decoded.split(':');
-        if (user !== Username || pass !== Password || secret !== Secret) {
-            ctx.status = 403;
-            ctx.body = 'Forbidden';
-            return;
-        }
-
+        const logs = await getLogs();
         ctx.message = "Fetched audit logs";
         ctx.body = { logs };
     });
@@ -155,7 +154,36 @@ const koaRouter = async ({ Username = 'admin', Password = 'admin', Secret }: TRo
     ]);
 };
 
-function getRequestBody(ctx: any): Promise<any> {
+
+const validateSession = (ctx: Context, info: any) => {
+    const session = getCookie(ctx, 'session');
+    if (!session) {
+        ctx.status = 403;
+        ctx.body = 'Forbidden';
+        ctx.message = "Unauthorized ui access";
+        return false;
+    }
+
+    let decoded: string;
+    try {
+        decoded = decodeSession(session);
+    } catch {
+        ctx.status = 403;
+        ctx.body = 'Forbidden';
+        return false;
+    }
+
+    const [user, pass, secret] = decoded.split(':');
+    if (user !== info.Username || pass !== info.Password || secret !== info.Secret) {
+        ctx.status = 403;
+        ctx.body = 'Forbidden';
+        return false;
+    }
+
+    return true;
+};
+
+const getRequestBody = (ctx: any): Promise<any> => {
     return new Promise((resolve) => {
         let body = '';
         ctx.req.on('data', (chunk: Buffer) => (body += chunk.toString()));
@@ -167,7 +195,7 @@ function getRequestBody(ctx: any): Promise<any> {
             }
         });
     });
-}
+};
 
 // Helper: Basic cookie parser
 function getCookie(ctx: any, key: string): string | null {
