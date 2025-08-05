@@ -1,25 +1,23 @@
-
-
 # 🛡️ Auditor
 
 this is a lightweight, type-safe, and framework-agnostic backend auditing system for Node.js — not just another logger.
 
 It enables structured auditing of:
-- Request and response activity
-- Application-level events (e.g. user logins, deletions)
-- Errors and exceptions
-- Database operations with Mongoose and Prisma
-- Optional remote logging via [BetterStack](https://betterstack.com)
-- Optional UI dashboard for inspecting audit logs
+
+* Request and response activity
+* Application-level events (e.g. user logins, deletions)
+* Errors and exceptions
+* Database operations with Mongoose and Prisma
+* Optional remote logging via [BetterStack](https://betterstack.com)
+* Optional UI dashboard for inspecting audit logs
 
 Auditor helps provide observability, traceability, and accountability for your backend services.
-
 
 ## 📦 Installation
 
 ```bash
 npm install @kingdiablo/auditor
-````
+```
 
 You can also install and use your preferred logger and optionally an ORM:
 
@@ -195,7 +193,7 @@ await audit.Setup();
 
 ---
 
-## 🪵 Business Event Logging (`Log`)
+## 💵 Business Event Logging (`Log`)
 
 Use `Log` to track user actions and meaningful server events.
 
@@ -225,7 +223,7 @@ audit.Log({
 
 ---
 
-## 🛑 Manual Error Logging (`LogError`)
+## 🚠 Manual Error Logging (`LogError`)
 
 ```ts
 try {
@@ -237,7 +235,7 @@ try {
 
 ---
 
-## 🗄️ Mongoose Schema Auditing (`AuditModel`)
+## 💄 Mongoose Schema Auditing (`AuditModel`)
 
 ```ts
 import mongoose from 'mongoose';
@@ -306,16 +304,103 @@ app.use(audit.ErrorLogger());
 
 ---
 
-## 🧭 Roadmap & Planned Features
+## 🧝‍♂️ Log Retention / Rotation
 
-* [x] Core audit logger class
-* [x] Request and error middleware (Express, Fastify, Koa)
-* [x] File-based JSON logging
-* [x] Database audit logging for Mongoose and Prisma
-* [x] UI support (Express, Fastify, Koa)
-* [x] Remote logging via BetterStack
-* [x] Log retention and file rotation
-* [ ] Sequelize support (planned)
+### 📌 Quick Overview
+
+| Feature                           | Setup Required | Default State | Usage                                                   |
+| --------------------------------- | -------------- | ------------- | ------------------------------------------------------- |
+| **Log Retention & File Rotation** | ✅ Optional     | Disabled      | Automatic cleanup of old logs                           |
+| **Log File Splitting**            | ✅ Optional     | Disabled      | Separate logs by type                                   |
+| **Archive Cleanup**               | ✅ Automatic    | Automatic     | Auto-cleanup old archives (if max retention is active ) |
+
+---
+
+### 🔧 1. Log Retention & File Rotation
+
+#### What it does
+
+* Automatically rotates log files when they exceed size limits
+* Archives old logs to `/logs/archive/`
+* Cleans up archives older than configured days
+
+#### Setup
+
+```ts
+import { Auditor } from '@kingdiablo/auditor';
+
+const audit = new Auditor({
+	destinations: ['file'],
+	maxRetention: 7, // Keep logs for 7 days
+	splitFiles: true, // Enable file splitting
+});
+
+await audit.Setup();
+audit.SetFileConfig({
+	folderName: 'logs',
+	fileName: 'my-app',
+});
+```
+
+#### Usage
+
+* Logs will auto-rotate when > 5MB
+* Archives stored in `logs/archive/`
+* Cleanup runs daily at midnight
+
+---
+
+### 📁 2. Log File Splitting
+
+#### What it does
+
+* Splits logs into separate files by type:
+
+  * `request.log` - HTTP requests
+  * `error.log` - Errors/exceptions
+  * `db.log` - Database operations
+  * `audit.log` - General audit events
+
+#### Setup
+
+```ts
+const audit = new Auditor({
+	destinations: ['file'],
+	splitFiles: true, // Enable splitting
+});
+
+await audit.Setup();
+```
+
+#### File Structure
+
+```
+logs/
+├── my-app-request.log
+├── my-app-error.log
+├── my-app-db.log
+├── my-app-audit.log
+└── archive/
+    ├── my-app_2024-01-15_12-00-00.log
+    └── ...
+```
+
+---
+
+### 🧹 3. Archive Cleanup
+
+#### What it does
+
+* Automatically deletes archived logs older than configured days
+* Runs during log rotation
+
+#### Setup
+
+```ts
+const audit = new Auditor({
+	maxRetention: 30, // Delete archives older than 30 days
+});
+```
 
 ---
 
@@ -328,12 +413,6 @@ See the [CHANGELOG.md](./CHANGELOG.md) for full release notes.
 ## 📤 Remote Logging
 
 See the [REMOTE\_LOGGING.md](./REMOTE_LOGGING.md) for setup and usage.
-
----
-
-## 🪵 Log Retention / Rotation
-
-See the [LOG\_RETENTION.md](./LOG_RETENTION.md) for more information.
 
 ---
 
