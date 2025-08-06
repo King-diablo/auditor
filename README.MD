@@ -1,20 +1,23 @@
-
 # 🛡️ Auditor
 
-Auditor is a lightweight, type-safe, and framework-agnostic audit logger for Node.js. It provides:
+this is a lightweight, type-safe, and framework-agnostic backend auditing system for Node.js — not just another logger.
 
--   Request and error logging middleware for **Express**, **Fastify**, and **Koa**
--   Type-safe business event logging
--   Current flexible log destinations (console, file) with remote coming soon
--   **Database audit logging for Mongoose (MongoDB)** and **Prisma** with others planned
+It enables structured auditing of:
 
----
+* Request and response activity
+* Application-level events (e.g. user logins, deletions)
+* Errors and exceptions
+* Database operations with Mongoose and Prisma
+* Optional remote logging via [BetterStack](https://betterstack.com)
+* Optional UI dashboard for inspecting audit logs
+
+Auditor helps provide observability, traceability, and accountability for your backend services.
 
 ## 📦 Installation
 
 ```bash
 npm install @kingdiablo/auditor
-````
+```
 
 You can also install and use your preferred logger and optionally an ORM:
 
@@ -26,7 +29,7 @@ npm install winston mongoose
 
 ## ℹ️ Quick Start (v0.3.0+)
 
-> **Note:** After creating an `Auditor` instance, you **must** call `.Setup()` before using any middleware or logging features. This step is required for proper initialization.
+> **Note:** After creating an `Auditor` instance, you **must** call `.Setup()` before using any middleware or logging features.
 
 ### Express
 
@@ -52,7 +55,7 @@ await audit.Setup();
 const fastify = Fastify();
 fastify.addHook('onRequest', audit.RequestLogger().onRequest);
 fastify.addHook('onResponse', audit.RequestLogger().onResponse);
-// For error logging, use fastify.setErrorHandler(audit.ErrorLogger());
+fastify.setErrorHandler(audit.ErrorLogger());
 ```
 
 ### Koa
@@ -65,27 +68,20 @@ const audit = new Auditor({ framework: 'koa' });
 await audit.Setup();
 const app = new Koa();
 app.use(audit.RequestLogger());
-// For error logging, use app.use(audit.ErrorLogger());
+app.use(audit.ErrorLogger());
 ```
 
 ---
 
-## 🖥️ Using the Audit UI (Express, Fastify and Koa)
+## 🖥️ Using the Audit UI (Express, Fastify, and Koa)
 
-Auditor supports a built-in UI to view audit logs. To enable the UI, set the `useUI` option to `true` when creating the `Auditor` instance. This will download necessary UI dependencies and provide routes to serve the UI and logs.
+Auditor provides an optional self-hosted UI to view and explore audit logs. To enable it, set `useUI: true`. Dependencies are downloaded at runtime — no CDN used.
 
 ### Express UI Setup
 
 ```ts
-import { Auditor } from '@kingdiablo/auditor';
-import express from 'express';
-
 const audit = new Auditor({ framework: 'express', useUI: true });
 await audit.Setup();
-
-const app = express();
-app.use(audit.RequestLogger());
-app.use(audit.ErrorLogger());
 
 if (audit.CreateUI) {
 	const auditUI = await audit.CreateUI();
@@ -96,16 +92,8 @@ if (audit.CreateUI) {
 ### Fastify UI Setup
 
 ```ts
-import { Auditor } from '@kingdiablo/auditor';
-import Fastify from 'fastify';
-
 const audit = new Auditor({ framework: 'fastify', useUI: true });
 await audit.Setup();
-
-const fastify = Fastify();
-fastify.addHook('onRequest', audit.RequestLogger().onRequest);
-fastify.addHook('onResponse', audit.RequestLogger().onResponse);
-fastify.setErrorHandler(audit.ErrorLogger());
 
 const auditUI = await audit.CreateUI();
 fastify.register(auditUI);
@@ -118,15 +106,8 @@ fastify.listen(3000, () => {
 ### Koa UI Setup
 
 ```ts
-import { Auditor } from '@kingdiablo/auditor';
-import Koa from 'koa';
-
 const audit = new Auditor({ framework: 'koa', useUI: true });
 await audit.Setup();
-
-const app = new Koa();
-app.use(audit.RequestLogger());
-app.use(audit.ErrorLogger());
 
 const auditUI = await audit.CreateUI();
 app.use(auditUI);
@@ -136,7 +117,7 @@ app.listen(3000, () => {
 });
 ```
 
-The UI will be available at `/audit-ui` and audit logs can be fetched from `/audit-log`.
+The UI will be available at `/audit-ui` and logs can be fetched from `/audit-log`.
 
 ---
 
@@ -164,12 +145,17 @@ Default values:
 ```ts
 const audit = new Auditor({
 	logger: myLogger,
-	destinations: ['console', 'file'],
+	destinations: ['console', 'file', 'remote'],
 	dbType: 'mongoose',
 	useTimeStamp: true,
 	splitFiles: true,
 	framework: 'fastify',
 	useUI: true,
+	remote: {
+		provider: 'betterstack',
+		apiKey: process.env.BETTERSTACK_API_KEY,
+		sourceId: process.env.BETTERSTACK_SOURCE_ID
+	}
 });
 await audit.Setup();
 ```
@@ -181,54 +167,63 @@ await audit.Setup();
 * Multi-framework support
 * Request/error middleware
 * File-based JSON logging
+* Remote logging via BetterStack
 * Database audit logging (Mongoose + Prisma)
-* User context capture (userId, IP, endpoint)
-* Split file logging
-* Type-safe business event logging
-* Pluggable loggers (Console, Winston, Pino)
-* Optional system error signal logging
-* UI dashboard support
+* Manual structured business event logging
+* Split file logging per log type
+* Pluggable logger support (Winston, Pino, Console)
+* Optional system error capture
+* Optional UI dashboard
 
 ---
 
 ## ⚙ Configuration Options
 
-| Option                | Type      | Default       | Description                                      |
-| --------------------- | --------- | ------------- | ------------------------------------------------ |
-| `logger`              | any       | `console`     | Your custom logger instance (Winston, Pino, etc) |
-| `destinations`        | string\[] | `['console']` | Log destinations (`console`, `file`)             |
-| `dbType`              | string    | `'none'`      | `'mongoose'`, `'prisma'`                         |
-| `useTimeStamp`        | boolean   | `true`        | Add timestamp to logs                            |
-| `splitFiles`          | boolean   | `false`       | Use separate files for each log type             |
-| `framework`           | string    | `'express'`   | `'express'`, `'fastify'`, `'koa'`                |
-| `captureSystemErrors` | boolean   | `false`       | Capture uncaught exceptions, SIGTERM, etc        |
-| `useUI`               | boolean   | `false`       | Serve the audit dashboard                        |
+| Option                | Type      | Default       | Description                                       |
+| --------------------- | --------- | ------------- | ------------------------------------------------- |
+| `logger`              | any       | `console`     | Custom logger instance (Winston, Pino, etc)       |
+| `destinations`        | string\[] | `['console']` | Where to write logs (`console`, `file`, `remote`) |
+| `dbType`              | string    | `'none'`      | `'mongoose'` or `'prisma'`                        |
+| `useTimeStamp`        | boolean   | `true`        | Adds timestamps to logs                           |
+| `splitFiles`          | boolean   | `false`       | Split logs into separate files                    |
+| `framework`           | string    | `'express'`   | `'express'`, `'fastify'`, `'koa'`                 |
+| `captureSystemErrors` | boolean   | `false`       | Capture uncaught exceptions/signals               |
+| `useUI`               | boolean   | `false`       | Serve the frontend dashboard                      |
+| `remote`              | object    | `undefined`   | Configuration for BetterStack                     |
 
 ---
 
-## 🪵 Business Event Logging (`Log`)
+## 💵 Business Event Logging (`Log`)
+
+Use `Log` to track user actions and meaningful server events.
+
+> ⚠️ Auditor cannot automatically track user-level actions — you must log them explicitly.
 
 ```ts
 audit.Log({
 	type: 'auth',
 	action: 'login',
+	status: 'success',
+	actor: 'admin',
 	message: 'User logged in successfully.',
+	meta: { userId: 'abc123' }
 });
 ```
 
-Custom events are supported:
+Custom types/actions are supported:
 
 ```ts
 audit.Log({
 	type: 'custom_event',
 	action: 'something_happened',
-	message: 'A custom event occurred.',
+	status: 'info',
+	message: 'A custom event occurred.'
 });
 ```
 
 ---
 
-## 🛑 Manual Error Logging (`LogError`)
+## 🚠 Manual Error Logging (`LogError`)
 
 ```ts
 try {
@@ -240,7 +235,7 @@ try {
 
 ---
 
-## 🗄️ Mongoose Schema Auditing (`AuditModel`)
+## 💄 Mongoose Schema Auditing (`AuditModel`)
 
 ```ts
 import mongoose from 'mongoose';
@@ -250,7 +245,7 @@ const audit = new Auditor({ dbType: 'mongoose' });
 await audit.Setup();
 
 const userSchema = new mongoose.Schema({
-	/* fields */
+	// schema fields...
 });
 
 audit.AuditModel(userSchema);
@@ -309,16 +304,103 @@ app.use(audit.ErrorLogger());
 
 ---
 
-## 🧭 Roadmap & Planned Features
+## 🧝‍♂️ Log Retention / Rotation
 
--   [x] Core audit logger class
--   [x] Request and error middleware for Express, Fastify, Koa
--   [x] File-based JSON logging
--   [x] **Database audit** — log database operations for Mongoose (MongoDB) and Prisma
--   [x] Audit UI support for Express, Fastify, and Koa
--   [x] Remote logging transport
--   [x] More configuration options: log rotation
--   [ ] Sequelize support (planned)
+### 📌 Quick Overview
+
+| Feature                           | Setup Required | Default State | Usage                                                   |
+| --------------------------------- | -------------- | ------------- | ------------------------------------------------------- |
+| **Log Retention & File Rotation** | ✅ Optional     | Disabled      | Automatic cleanup of old logs                           |
+| **Log File Splitting**            | ✅ Optional     | Disabled      | Separate logs by type                                   |
+| **Archive Cleanup**               | ✅ Automatic    | Automatic     | Auto-cleanup old archives (if max retention is active ) |
+
+---
+
+### 🔧 1. Log Retention & File Rotation
+
+#### What it does
+
+* Automatically rotates log files when they exceed size limits
+* Archives old logs to `/logs/archive/`
+* Cleans up archives older than configured days
+
+#### Setup
+
+```ts
+import { Auditor } from '@kingdiablo/auditor';
+
+const audit = new Auditor({
+	destinations: ['file'],
+	maxRetention: 7, // Keep logs for 7 days
+	splitFiles: true, // Enable file splitting
+});
+
+await audit.Setup();
+audit.SetFileConfig({
+	folderName: 'logs',
+	fileName: 'my-app',
+});
+```
+
+#### Usage
+
+* Logs will auto-rotate when > 5MB
+* Archives stored in `logs/archive/`
+* Cleanup runs daily at midnight
+
+---
+
+### 📁 2. Log File Splitting
+
+#### What it does
+
+* Splits logs into separate files by type:
+
+  * `request.log` - HTTP requests
+  * `error.log` - Errors/exceptions
+  * `db.log` - Database operations
+  * `audit.log` - General audit events
+
+#### Setup
+
+```ts
+const audit = new Auditor({
+	destinations: ['file'],
+	splitFiles: true, // Enable splitting
+});
+
+await audit.Setup();
+```
+
+#### File Structure
+
+```
+logs/
+├── my-app-request.log
+├── my-app-error.log
+├── my-app-db.log
+├── my-app-audit.log
+└── archive/
+    ├── my-app_2024-01-15_12-00-00.log
+    └── ...
+```
+
+---
+
+### 🧹 3. Archive Cleanup
+
+#### What it does
+
+* Automatically deletes archived logs older than configured days
+* Runs during log rotation
+
+#### Setup
+
+```ts
+const audit = new Auditor({
+	maxRetention: 30, // Delete archives older than 30 days
+});
+```
 
 ---
 
@@ -328,15 +410,9 @@ See the [CHANGELOG.md](./CHANGELOG.md) for full release notes.
 
 ---
 
-## 📤 RemoteLogging
+## 📤 Remote Logging
 
-See the [REMOTE_LOGGING.md](./REMOTE_LOGGING.md) for more information
-
----
-
-## 🪵 More On Log Rotation
-
-See the [LOG_RETENTION.md](./LOG_RETENTION.md.md) for more information
+See the [REMOTE\_LOGGING.md](./REMOTE_LOGGING.md) for setup and usage.
 
 ---
 
@@ -348,4 +424,4 @@ MIT
 
 ## 🙌 Contributing
 
-Contributions welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for more info.
+Contributions welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
