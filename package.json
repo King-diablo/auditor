@@ -1,6 +1,6 @@
 {
   "name": "@kingdiablo/auditor",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "A lightweight and customizable audit logger for Node.js apps. Tracks database changes, errors, and user actions with support for external loggers like Winston or Pino.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
