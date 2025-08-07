@@ -4,12 +4,12 @@ this is a lightweight, type-safe, and framework-agnostic backend auditing system
 
 It enables structured auditing of:
 
-* Request and response activity
-* Application-level events (e.g. user logins, deletions)
-* Errors and exceptions
-* Database operations with Mongoose and Prisma
-* Optional remote logging via [BetterStack](https://betterstack.com)
-* Optional UI dashboard for inspecting audit logs
+-   Request and response activity
+-   Application-level events (e.g. user logins, deletions)
+-   Errors and exceptions
+-   Database operations with Mongoose and Prisma
+-   Optional remote logging via [BetterStack](https://betterstack.com)
+-   Optional UI dashboard for inspecting audit logs
 
 Auditor helps provide observability, traceability, and accountability for your backend services.
 
@@ -121,6 +121,78 @@ The UI will be available at `/audit-ui` and logs can be fetched from `/audit-log
 
 ---
 
+## 🔐 UI Security Features
+
+The audit UI includes built-in security measures to protect sensitive audit logs:
+
+### Authentication System
+
+-   **Login Required**: All UI routes require authentication
+-   **Session Management**: Uses secure HTTP-only cookies
+-   **Secret Key**: Requires a secret key for session validation
+
+### Available Routes
+
+-   `/auth-ui` - Login page (unauthenticated)
+-   `/login` - Authentication endpoint (POST)
+-   `/logout` - Session termination
+-   `/audit-ui` - Main dashboard (authenticated only)
+-   `/audit-log` - API endpoint for logs (authenticated only)
+
+### Security Configuration
+
+```ts
+// Configure UI security when creating the audit instance
+const audit = new Auditor({
+	framework: 'express',
+	useUI: true,
+	// Security credentials
+	uiCredentials: {
+		username: 'admin', // Default: 'admin'
+		password: 'securepass', // Default: 'admin'
+		secret: 'your-secret-key', // Required for session validation
+	},
+});
+```
+
+### Session Security
+
+-   **HTTP-only cookies**: Prevents XSS attacks
+-   **SameSite=strict**: CSRF protection
+-   **Secure flag**: HTTPS enforcement (configurable)
+-   **Session timeout**: 1 hour expiration
+-   **Base64 encoding**: Credentials are encoded but not encrypted
+
+### Access Control
+
+-   **Route protection**: All sensitive routes require valid session
+-   **Automatic redirects**: Unauthorized users redirected to login
+-   **Error handling**: Returns 403 Forbidden for unauthorized access
+
+### Security Best Practices
+
+1. **Change default credentials**: Always update from default 'admin/admin'
+2. **Use strong secrets**: Generate cryptographically secure secret keys
+3. **HTTPS in production**: Enable secure cookies in production
+4. **Environment variables**: Store credentials in environment variables
+5. **Regular rotation**: Change credentials periodically
+
+### Example Secure Setup
+
+```ts
+const audit = new Auditor({
+	framework: 'express',
+	useUI: true,
+	uiCredentials: {
+		username: process.env.AUDIT_USERNAME || 'admin',
+		password: process.env.AUDIT_PASSWORD || 'admin',
+		secret: process.env.AUDIT_SECRET || 'default-secret-change-me',
+	},
+});
+```
+
+---
+
 ## 📄 Configuring File Logging (SetFileConfig)
 
 ```ts
@@ -135,8 +207,8 @@ audit.SetFileConfig({
 
 Default values:
 
-* `folderName`: `audit`
-* `fileName`: `audit`
+-   `folderName`: `audit`
+-   `fileName`: `audit`
 
 ---
 
@@ -154,8 +226,8 @@ const audit = new Auditor({
 	remote: {
 		provider: 'betterstack',
 		apiKey: process.env.BETTERSTACK_API_KEY,
-		sourceId: process.env.BETTERSTACK_SOURCE_ID
-	}
+		sourceId: process.env.BETTERSTACK_SOURCE_ID,
+	},
 });
 await audit.Setup();
 ```
@@ -164,16 +236,16 @@ await audit.Setup();
 
 ## 🚀 Features
 
-* Multi-framework support
-* Request/error middleware
-* File-based JSON logging
-* Remote logging via BetterStack
-* Database audit logging (Mongoose + Prisma)
-* Manual structured business event logging
-* Split file logging per log type
-* Pluggable logger support (Winston, Pino, Console)
-* Optional system error capture
-* Optional UI dashboard
+-   Multi-framework support
+-   Request/error middleware
+-   File-based JSON logging
+-   Remote logging via BetterStack
+-   Database audit logging (Mongoose + Prisma)
+-   Manual structured business event logging
+-   Split file logging per log type
+-   Pluggable logger support (Winston, Pino, Console)
+-   Optional system error capture
+-   Optional UI dashboard
 
 ---
 
@@ -206,7 +278,7 @@ audit.Log({
 	status: 'success',
 	actor: 'admin',
 	message: 'User logged in successfully.',
-	meta: { userId: 'abc123' }
+	meta: { userId: 'abc123' },
 });
 ```
 
@@ -217,7 +289,7 @@ audit.Log({
 	type: 'custom_event',
 	action: 'something_happened',
 	status: 'info',
-	message: 'A custom event occurred.'
+	message: 'A custom event occurred.',
 });
 ```
 
@@ -310,9 +382,9 @@ app.use(audit.ErrorLogger());
 
 | Feature                           | Setup Required | Default State | Usage                                                   |
 | --------------------------------- | -------------- | ------------- | ------------------------------------------------------- |
-| **Log Retention & File Rotation** | ✅ Optional     | Disabled      | Automatic cleanup of old logs                           |
-| **Log File Splitting**            | ✅ Optional     | Disabled      | Separate logs by type                                   |
-| **Archive Cleanup**               | ✅ Automatic    | Automatic     | Auto-cleanup old archives (if max retention is active ) |
+| **Log Retention & File Rotation** | ✅ Optional    | Disabled      | Automatic cleanup of old logs                           |
+| **Log File Splitting**            | ✅ Optional    | Disabled      | Separate logs by type                                   |
+| **Archive Cleanup**               | ✅ Automatic   | Automatic     | Auto-cleanup old archives (if max retention is active ) |
 
 ---
 
@@ -320,9 +392,9 @@ app.use(audit.ErrorLogger());
 
 #### What it does
 
-* Automatically rotates log files when they exceed size limits
-* Archives old logs to `/logs/archive/`
-* Cleans up archives older than configured days
+-   Automatically rotates log files when they exceed size limits
+-   Archives old logs to `/logs/archive/`
+-   Cleans up archives older than configured days
 
 #### Setup
 
@@ -344,9 +416,9 @@ audit.SetFileConfig({
 
 #### Usage
 
-* Logs will auto-rotate when > 5MB
-* Archives stored in `logs/archive/`
-* Cleanup runs daily at midnight
+-   Logs will auto-rotate when > 5MB
+-   Archives stored in `logs/archive/`
+-   Cleanup runs daily at midnight
 
 ---
 
@@ -354,12 +426,12 @@ audit.SetFileConfig({
 
 #### What it does
 
-* Splits logs into separate files by type:
+-   Splits logs into separate files by type:
 
-  * `request.log` - HTTP requests
-  * `error.log` - Errors/exceptions
-  * `db.log` - Database operations
-  * `audit.log` - General audit events
+    -   `request.log` - HTTP requests
+    -   `error.log` - Errors/exceptions
+    -   `db.log` - Database operations
+    -   `audit.log` - General audit events
 
 #### Setup
 
@@ -391,8 +463,8 @@ logs/
 
 #### What it does
 
-* Automatically deletes archived logs older than configured days
-* Runs during log rotation
+-   Automatically deletes archived logs older than configured days
+-   Runs during log rotation
 
 #### Setup
 
@@ -412,7 +484,7 @@ See the [CHANGELOG.md](./CHANGELOG.md) for full release notes.
 
 ## 📤 Remote Logging
 
-See the [REMOTE\_LOGGING.md](./REMOTE_LOGGING.md) for setup and usage.
+See the [REMOTE_LOGGING.md](./REMOTE_LOGGING.md) for setup and usage.
 
 ---
 
