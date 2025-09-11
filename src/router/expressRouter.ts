@@ -1,4 +1,3 @@
-import chalk from "chalk";
 import path from "path";
 import { AppConfig } from "../core/AppConfigs";
 import { TRouter } from "../types";
@@ -30,11 +29,11 @@ const expressRouter = async ({ Username = "admin", Password = "admin", Secret }:
     try {
         express = await import("express");
         if (!Secret) {
-            AppConfig.getAuditOption()?.logger?.info(chalk.redBright("You must provide a secret to use this route"));
+            AppConfig.getAuditOption()?.logger?.info(("You must provide a secret to use this route"));
             return (req: any, res: any, next: any) => next();
         }
     } catch (error) {
-        AppConfig.getAuditOption()?.logger?.info(chalk.redBright("Please install express in order to use this module"));
+        AppConfig.getAuditOption()?.logger?.info(("Please install express in order to use this module"));
         return (req: any, res: any, next: any) => next();
     }
 

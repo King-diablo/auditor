@@ -1,4 +1,3 @@
-import chalk from 'chalk';
 import { AppConfig } from '../core/AppConfigs';
 import fs from 'fs';
 import path from "path";
@@ -35,13 +34,13 @@ const koaRouter = async ({ Username = 'admin', Password = 'admin', Secret }: TRo
         compose = (await import('koa-compose')).default;
     } catch {
         AppConfig.getAuditOption()?.logger?.info(
-            chalk.redBright("Please install koa, @koa/router, koa-static, and koa-compose to use the audit UI."),
+            ("Please install koa, @koa/router, koa-static, and koa-compose to use the audit UI."),
         );
         return async (ctx: any, next: any) => await next();
     }
 
     if (!Secret) {
-        AppConfig.getAuditOption()?.logger?.info(chalk.redBright("You must provide a secret to use this route"));
+        AppConfig.getAuditOption()?.logger?.info(("You must provide a secret to use this route"));
         return async (ctx: any, next: any) => await next();
     }
 

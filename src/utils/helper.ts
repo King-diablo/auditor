@@ -1,4 +1,3 @@
-import chalk from 'chalk';
 import crypto from "crypto";
 import { Request } from 'express';
 import fs from "fs/promises";
@@ -55,7 +54,7 @@ export const logAuditEvent = (content: any, file?: TFileConfig) => {
     }
 
     if (config.destinations?.includes("remote")) {
-        betterStack(content).catch(err => AppConfig.getAuditOption()?.logger?.error(chalk.redBright("failed to send log to remote source", err)));
+        betterStack(content).catch(err => AppConfig.getAuditOption()?.logger?.error("failed to send log to remote source", err));
         return;
     }
 
@@ -74,7 +73,7 @@ const saveToFile = async (file: TFileConfig, content: any) => {
         await fs.appendFile(file.fullPath, `${JSON.stringify(content)}\n`, { encoding: "utf-8" });
 
     } catch (error) {
-        config?.logger?.error(chalk.redBright("Failed to save log to file", error));
+        config?.logger?.error("Failed to save log to file", error);
     }
 };
 
@@ -116,16 +115,16 @@ export const checkForModule = (item: string) => {
     try {
         const requireFromUserProject = createRequire(path.join(process.cwd(), 'index.js'));
         AppConfig.getAuditOption()?.logger?.info(
-            chalk.blueBright(`Checking for ${item}`),
+            (`Checking for ${item}`),
         );
         requireFromUserProject.resolve(item);
         AppConfig.getAuditOption()?.logger?.info(
-            chalk.greenBright(`${item} found.`),
+            (`${item} found.`),
         );
         return true;
     } catch (error) {
         AppConfig.getAuditOption()?.logger?.info(
-            chalk.redBright(`Failed to find "${item}"`),
+            (`Failed to find "${item}"`),
         );
         return false;
     }
@@ -142,7 +141,7 @@ export const handleLogRotation = async () => {
     if (canDeleteArchive()) deleteArchives(activeFile);
     if (!await fileLimitExceeded(activeFile)) return;
 
-    config?.logger?.warn(chalk.yellowBright(`${activeFile.fileName} has reached or exceeded the size limit ${formatBytes(activeFile.maxSizeBytes)}`));
+    config?.logger?.warn((`${activeFile.fileName} has reached or exceeded the size limit ${formatBytes(activeFile.maxSizeBytes)}`));
     await createLogArchive(activeFile);
     await clearOriginalArchive(activeFile);
 };
@@ -200,7 +199,7 @@ const deleteArchives = async (fileConfig: TFileConfig) => {
             const filePath = path.join(archiveLocation, file);
             await fs.rm(filePath);
         } else
-            logger?.warn(chalk.yellowBright(`archive logs ${file} will be deleted soon after ${days} day(s) from now at ${expireDate}`));
+            logger?.warn((`archive logs ${file} will be deleted soon after ${days} day(s) from now at ${expireDate}`));
 
     }
 };
@@ -222,7 +221,7 @@ const pathExist = async (path: string) => {
         await fs.access(path);
         return true;
     } catch (error) {
-        AppConfig.getAuditOption()?.logger?.error(chalk.redBright(`failed to located directory/file at ${path}`));
+        AppConfig.getAuditOption()?.logger?.error((`failed to located directory/file at ${path}`));
         return false;
     }
 };

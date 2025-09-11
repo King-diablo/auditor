@@ -1,4 +1,3 @@
-import chalk from 'chalk';
 import { FastifyRequest } from 'fastify';
 import { FastifyReply } from 'fastify/types/reply';
 import { AppConfig } from '../core/AppConfigs';
@@ -37,7 +36,7 @@ const fastifyRouter = async ({ Username = "admin", Password = "admin", Secret }:
 
     } catch {
         AppConfig.getAuditOption()?.logger?.info(
-            chalk.redBright("Please install @fastify/static to use the audit UI."),
+            ("Please install @fastify/static to use the audit UI."),
         );
         return async () => { };
     }

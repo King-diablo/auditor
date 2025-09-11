@@ -1,4 +1,3 @@
-import chalk from "chalk";
 import { auditModel, checkForMongodb } from "../database/mongodb";
 import { auditPrisma, checkForPrisma } from "../database/prisma";
 import { errorLogger, requestLogger } from "../middleware";
@@ -104,12 +103,12 @@ export class Audit<F extends Framework = "express"> {
     async Setup() {
 
         if (this.isInitialized) {
-            this.auditOptions.logger?.warn(chalk.yellow("Audit already initialized."));
+            this.auditOptions.logger?.warn(("Audit already initialized."));
             return;
         }
 
         if (this.auditOptions.destinations?.includes("remote") && (!this.remoteConfig?.token || !this.remoteConfig?.url)) {
-            this.auditOptions.logger?.warn(chalk.yellowBright("betterStack token is required inOrder to send logs"));
+            this.auditOptions.logger?.warn(("betterStack token is required inOrder to send logs"));
         }
 
         await this.CreateFileLocation(this.fileConfig);
@@ -137,7 +136,7 @@ export class Audit<F extends Framework = "express"> {
         if (this.auditOptions.useUI) {
             const hasFramework = checkForFramework();
             if (hasFramework) {
-                AppConfig.getAuditOption()?.logger?.info(chalk.yellow("In order to use this module some dependency will be downloaded"));
+                AppConfig.getAuditOption()?.logger?.info(("In order to use this module some dependency will be downloaded"));
                 await downloadDependency();
             }
         } else await deleteDownloadedDependency();
@@ -149,7 +148,7 @@ export class Audit<F extends Framework = "express"> {
 
         this.HandleSystemErrors();
 
-        this.auditOptions.logger?.info(chalk.green("Default Audit config set successfully"));
+        this.auditOptions.logger?.info(("Default Audit config set successfully"));
 
         if (AppConfig.getAuditOption()?.maxRetention ?? 0 > 0) {
             beginSchedule();
@@ -180,7 +179,7 @@ export class Audit<F extends Framework = "express"> {
         const item = generateAuditContent({ ...event });
 
         if (!this.isInitialized) {
-            this.auditOptions?.logger?.info(chalk.red("Not Initialized. Setup Is Required"));
+            this.auditOptions?.logger?.info(("Not Initialized. Setup Is Required"));
             return;
         }
 
@@ -194,7 +193,7 @@ export class Audit<F extends Framework = "express"> {
             const file = this.auditOptions.splitFiles ? actionFile : this.fileConfig;
 
             if (!file.fullPath) {
-                this.auditOptions.logger?.error(chalk.red("Unable to locate file path"));
+                this.auditOptions.logger?.error(("Unable to locate file path"));
                 return;
             }
 
@@ -203,7 +202,7 @@ export class Audit<F extends Framework = "express"> {
 
         if (this.auditOptions.destinations?.includes("remote")) {
             if (!this.remoteConfig?.url || !this.remoteConfig.token) {
-                this.auditOptions.logger?.error(chalk.redBright("Token from telemetry.betterStack is required"));
+                this.auditOptions.logger?.error(("Token from telemetry.betterStack is required"));
                 return;
             }
 
@@ -226,7 +225,7 @@ export class Audit<F extends Framework = "express"> {
     LogError(error: any) {
 
         if (!this.isInitialized) {
-            this.auditOptions?.logger?.info(chalk.red("Not Initialized. Setup Is Required"));
+            this.auditOptions?.logger?.info(("Not Initialized. Setup Is Required"));
             return;
         }
 
@@ -259,7 +258,7 @@ export class Audit<F extends Framework = "express"> {
             const file = this.auditOptions.splitFiles ? actionFile : this.fileConfig;
 
             if (!file.fullPath) {
-                this.auditOptions.logger?.error(chalk.redBright("Unable to locate file path"));
+                this.auditOptions.logger?.error(("Unable to locate file path"));
                 return;
             }
 
@@ -268,7 +267,7 @@ export class Audit<F extends Framework = "express"> {
 
         if (this.auditOptions.destinations?.includes("remote")) {
             if (!this.remoteConfig?.url || !this.remoteConfig.token) {
-                this.auditOptions.logger?.error(chalk.redBright("Token from telemetry.betterStack is required"));
+                this.auditOptions.logger?.error(("Token from telemetry.betterStack is required"));
                 return;
             }
 
@@ -292,7 +291,7 @@ export class Audit<F extends Framework = "express"> {
         */
     AuditModel(schema: DBInstance) {
         if (!schema) {
-            this.auditOptions.logger?.error(chalk.red("No schema or client provided"));
+            this.auditOptions.logger?.error(("No schema or client provided"));
             return;
         }
         if (this.auditOptions.dbType === "mongoose")
@@ -316,12 +315,12 @@ export class Audit<F extends Framework = "express"> {
     SetFileConfig(config: Omit<TFileConfig, "fullPath">) {
 
         if (!this.auditOptions.destinations?.includes("file")) {
-            this.auditOptions.logger?.warn(chalk.yellowBright("You need to add file to destinations for this to work properly"));
+            this.auditOptions.logger?.warn(("You need to add file to destinations for this to work properly"));
             return;
         }
 
         if (this.auditOptions.splitFiles) {
-            this.auditOptions.logger?.info(chalk.yellow("Cannot configure file as it is not supported when using splitfile"));
+            this.auditOptions.logger?.info(("Cannot configure file as it is not supported when using splitfile"));
             return;
         }
 
@@ -351,7 +350,7 @@ export class Audit<F extends Framework = "express"> {
         */
     SetRemoteConfig(config: TRemoteConfig) {
         if (this.isInitialized) {
-            AppConfig.getAuditOption()?.logger?.error(chalk.redBright("Must be configured before setup"));
+            AppConfig.getAuditOption()?.logger?.error(("Must be configured before setup"));
             return;
         }
         this.remoteConfig = config;
@@ -392,7 +391,7 @@ export class Audit<F extends Framework = "express"> {
     CreateUI() {
 
         if (!AppConfig.getUseUI()) {
-            AppConfig.getAuditOption()?.logger?.info(chalk.yellow("Add the useUI option in the constructor to download the dependency"));
+            AppConfig.getAuditOption()?.logger?.info(("Add the useUI option in the constructor to download the dependency"));
             return UIRouter[this.auditOptions.framework!];
         }
 
@@ -524,7 +523,7 @@ const processEmptyLog = (event: TEvent) => {
     if (!event?.message) missing.push("message");
 
     if (missing.length) {
-        AppConfig.getAuditOption()?.logger?.error(chalk.redBright(`Unable to log message. Missing: ${missing.join(", ")}`));
+        AppConfig.getAuditOption()?.logger?.error((`Unable to log message. Missing: ${missing.join(", ")}`));
         return true;
     }
 

@@ -1,4 +1,3 @@
-import chalk from "chalk";
 import { constants, createWriteStream } from "fs";
 import { access, mkdir, rm } from "fs/promises";
 import path from "path";
@@ -93,12 +92,12 @@ export const downloadDependency = async () => {
     if (!hasUIPath) {
         try {
             mkdir(uiPath, { recursive: true });
-            logger?.info(chalk.greenBright("ui folder generated successfully"));
+            logger?.info(("ui folder generated successfully"));
         } catch (error: any) {
-            logger?.error(chalk.redBright("failed to generate folder"));
+            logger?.error(("failed to generate folder"));
             if ("message" in error)
-                logger?.error(chalk.redBright(error.message));
-            else logger?.error(chalk.redBright(error));
+                logger?.error((error.message));
+            else logger?.error((error));
             return;
         }
     }
@@ -110,7 +109,7 @@ export const downloadDependency = async () => {
     }
 
     if (didDownload) {
-        logger?.info((chalk.green("Files downloaded successfully")));
+        logger?.info((("Files downloaded successfully")));
     }
 };
 
@@ -122,12 +121,12 @@ export const deleteDownloadedDependency = async () => {
 
     try {
         await rm(uiPath, { recursive: true });
-        logger?.info(chalk.greenBright("ui content deleted successfully"));
+        logger?.info(("ui content deleted successfully"));
     } catch (error: any) {
-        logger?.error(chalk.redBright("failed to delete ui content"));
+        logger?.error(("failed to delete ui content"));
         if ("message" in error)
-            logger?.error(chalk.redBright(error.message));
-        else logger?.error(chalk.redBright(error));
+            logger?.error((error.message));
+        else logger?.error((error));
     }
 };
 
@@ -137,16 +136,16 @@ async function downloadFile(url: string, fileName: string): Promise<boolean> {
     const hasLocation = await hasFileAccess(location);
 
     if (hasLocation) {
-        logger?.info(chalk.gray(`Skipping ${fileName}, already exists.`));
+        logger?.info((`Skipping ${fileName}, already exists.`));
         return false;
     }
 
-    logger?.info(chalk.yellow(`Downloading ${fileName}`));
+    logger?.info((`Downloading ${fileName}`));
 
     const res = await fetch(url);
 
     if (!res.ok || !res.body) {
-        logger?.error(chalk.red(`Failed to fetch ${url}: ${res.status}`));
+        logger?.error((`Failed to fetch ${url}: ${res.status}`));
         return false;
     }
 
@@ -155,10 +154,10 @@ async function downloadFile(url: string, fileName: string): Promise<boolean> {
 
     try {
         await pipeline(nodeStream, fileStream);
-        logger?.info(chalk.green(`Downloaded ${fileName} successfully.`));
+        logger?.info((`Downloaded ${fileName} successfully.`));
         return true;
     } catch (err) {
-        logger?.error(chalk.red(`Error writing ${fileName}: ${err}`));
+        logger?.error((`Error writing ${fileName}: ${err}`));
         return false;
     }
 }
