@@ -1,4 +1,3 @@
-import chalk from "chalk";
 import { AppConfig } from "../core/AppConfigs";
 
 export const betterStack = async (content: any) => {
@@ -15,7 +14,7 @@ export const betterStack = async (content: any) => {
             'Content-Type': 'application/json',
         },
         body: data,
-    }).catch(err => AppConfig.getAuditOption()?.logger?.error(chalk.redBright("failed to send audit to the remote source", err)));
+    }).catch(err => AppConfig.getAuditOption()?.logger?.error("failed to send audit to the remote source", err));
 
     // console.log(await request?.statusText ?? await request?.status);
 };

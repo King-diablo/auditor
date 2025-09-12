@@ -1,4 +1,3 @@
-import chalk from "chalk";
 import { Schema } from "mongoose";
 import { AppConfig } from "../../core/AppConfigs";
 import { checkForModule, generateAuditContent, getFileLocation, getTimeStamp, logAuditEvent } from "../../utils";
@@ -36,11 +35,11 @@ export const checkForMongodb = () => {
 export const auditModel = <T>(schema: Schema<T>) => {
     const config = AppConfig.getAuditOption()!;
     if (config.dbType === "none") {
-        config.logger?.error(chalk.yellow("Cannot audit db while DB type is set to none"));
+        config.logger?.error(("Cannot audit db while DB type is set to none"));
         return;
     }
     if (!hasMongoose) {
-        config.logger?.error(chalk.red("Please install mongoose to use audit"));
+        config.logger?.error(("Please install mongoose to use audit"));
         return;
     }
 

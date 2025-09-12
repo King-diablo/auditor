@@ -1,4 +1,3 @@
-import chalk from "chalk";
 import { AppConfig } from "../../core/AppConfigs";
 import { checkForModule, generateAuditContent, getFileLocation, handleLog, logAuditEvent } from "../../utils";
 import type { PrismaClient } from '@prisma/client';
@@ -18,9 +17,7 @@ export const auditPrisma = (client: PrismaClient) => {
 
     if (!client?.$use || typeof client.$use !== 'function') {
         config?.logger?.info(
-            chalk.redBright(
-                'Invalid PrismaClient instance passed. Ensure @prisma/client is installed and `prisma generate` has been run.',
-            )
+            'Invalid PrismaClient instance passed. Ensure @prisma/client is installed and `prisma generate` has been run.',
         );
         return;
     }
