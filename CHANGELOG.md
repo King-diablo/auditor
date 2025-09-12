@@ -2,9 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+
 ## Table of Contents
 
--   [Unreleased](#unreleased)
+-   [auditor 0.4.2](#auditor-042---2025-09-12)
 -   [auditor 0.4.0](#auditor-040---2025-08-06)
 -   [auditor 0.3.1](#auditor-031---2025-07-10)
 -   [auditor 0.3.0](#auditor-030---2025-07-08)
@@ -14,9 +15,16 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-## \[Unreleased]
 
-### Planned
+
+## auditor 0.4.2 - 2025-09-12 [[GitHub Release](https://github.com/King-diablo/auditor/releases/tag/v0.4.2)]
+
+### 🔒 Security
+- Removed `chalk` from dependencies due to recent npm compromise/hack warning. Auditor no longer relies on `chalk` for colored output.
+
+### Changed
+- Bumped version to 0.4.2.
+- Updated documentation and package metadata to reflect removal of `chalk`.
 
 ---
 
